@@ -1,0 +1,15 @@
+{
+  "name": "silverpay",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix admin && npm install --prefix app",
+    "db:seed": "npm run db:seed --prefix backend",
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix admin\" \"npm run dev --prefix app\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:admin": "npm run dev --prefix admin",
+    "dev:app": "npm run dev --prefix app"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

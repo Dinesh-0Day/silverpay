@@ -27,9 +27,19 @@ Database: **MongoDB Atlas** (free M0 works — replica set, transactions OK).
 1. [railway.com](https://railway.com) → **New Project** → **Deploy from GitHub repo** → select `silverpay` repo.
 2. Create **three services** from the same repo (duplicate service or “Add service”):
 
+### ⚠️ `Missing script: "build"` fix
+
+Railway **repo root** par build mat chalao — root `package.json` mein sirf `dev` scripts hain.
+
+Har service ke liye zaroor set karo:
+
+**Settings → Root Directory** = `backend` **ya** `app` **ya** `admin` (service ke hisaab se)
+
+Phir **Redeploy**. Build log mein ~26 packages nahi, backend ~100+, app ~400+ dikhne chahiye.
+
 ### Service A — `backend` (API)
 
-- **Settings → Root Directory:** `backend`
+- **Settings → Root Directory:** `backend` ← **required**
 - **Settings → Networking → Generate Domain** (note URL, e.g. `https://xxx.up.railway.app`)
 
 **Variables:**
@@ -55,7 +65,7 @@ Health check: `GET /health` → `{ "ok": true }`
 
 ### Service B — `app` (user PWA)
 
-- **Root Directory:** `app`
+- **Root Directory:** `app` ← **required**
 - **Generate Domain**
 
 **Variables (build-time):**
@@ -76,7 +86,7 @@ Redeploy app whenever you change this URL.
 
 ### Service C — `admin`
 
-- **Root Directory:** `admin`
+- **Root Directory:** `admin` ← **required**
 - **Generate Domain**
 
 **Variables:**
@@ -144,6 +154,7 @@ Set in **Admin → Settings** after login, or add backend env vars from `backend
 
 | Issue | Fix |
 |-------|-----|
+| `Missing script: "build"` | Set **Root Directory** to `backend` / `app` / `admin`, not empty |
 | `CORS_ORIGINS must be set` | Set `CORS_ORIGINS` on backend |
 | `Transaction numbers... replica set` | Use Atlas, not local standalone Mongo |
 | App white screen / API 404 | Rebuild app with correct `VITE_API_BASE_URL` |

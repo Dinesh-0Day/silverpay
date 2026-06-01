@@ -2,6 +2,7 @@
   "name": "silverpay",
   "private": true,
   "scripts": {
+    "build": "node -e \"console.error('\\nRailway: Settings → Root Directory must be backend, app, or admin (not repo root).\\nSee docs/RAILWAY_DEPLOY.md\\n'); process.exit(1)\"",
     "install:all": "npm install --prefix backend && npm install --prefix admin && npm install --prefix app",
     "db:seed": "npm run db:seed --prefix backend",
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix admin\" \"npm run dev --prefix app\"",

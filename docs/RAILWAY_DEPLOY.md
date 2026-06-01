@@ -155,6 +155,7 @@ Set in **Admin → Settings** after login, or add backend env vars from `backend
 | Issue | Fix |
 |-------|-----|
 | `Missing script: "build"` | Set **Root Directory** to `backend` / `app` / `admin`, not empty |
+| `@tailwindcss/oxide` / Node 18 | Root Directory sahi ho; Node **20** (`.node-version` in repo). Redeploy |
 | `CORS_ORIGINS must be set` | Set `CORS_ORIGINS` on backend |
 | `Transaction numbers... replica set` | Use Atlas, not local standalone Mongo |
 | App white screen / API 404 | Rebuild app with correct `VITE_API_BASE_URL` |

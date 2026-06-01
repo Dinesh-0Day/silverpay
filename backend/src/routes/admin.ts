@@ -13,13 +13,14 @@ import {
   SupportConversation,
 } from "../models/index.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
-import { creditWallet, releaseHold } from "../lib/wallet.js";
+import { creditWallet, debitWallet, releaseHold } from "../lib/wallet.js";
 import { LedgerEntry } from "../models/index.js";
 import { idStr, serialize, serializeList, serializeUser } from "../lib/serialize.js";
 import { approvePurchase } from "../lib/purchaseApproval.js";
 import { buildPlanName, normalizePlanCategory, normalizePlanType } from "../lib/plans.js";
 import {
   getPlatformSettings,
+  setMinUsdtDeposit,
   setReferralCommissionPercent,
   setUsdtToInrRate,
 } from "../lib/appSettings.js";
@@ -30,6 +31,13 @@ import { getHomeBanner, newSlideId, updateHomeBanner } from "../lib/homeBanner.j
 import { getNewbieRewards, newRewardItemId, updateNewbieRewards } from "../lib/newbieRewards.js";
 import { getHomePromo, updateHomePromo } from "../lib/homePromo.js";
 import { adminDepositsQuery } from "../lib/cancelPurchase.js";
+import {
+  buildAdminPayoutFilter,
+  isWithdrawalPayout,
+  withdrawalPayoutFilter,
+} from "../lib/planPurchasePayoutFeed.js";
+import { paginated, parsePaginationQuery } from "../lib/pagination.js";
+import { runWithTransaction } from "../lib/mongoTransaction.js";
 import { homeBannerUpload, homePromoUpload } from "../lib/upload.js";
 
 export const adminRouter = Router();
@@ -288,6 +296,7 @@ adminRouter.patch("/platform-settings", async (req: AuthRequest, res) => {
   const schema = z
     .object({
       usdtToInrRate: z.number().positive().max(10000).optional(),
+      minUsdtDeposit: z.number().positive().max(1_000_000).optional(),
       todayInrBonusPercent: z.number().min(0).max(100).optional(),
       referralCommissionPercent: z.number().min(0).max(100).optional(),
       currentPassword: z.string().min(1),
@@ -295,6 +304,7 @@ adminRouter.patch("/platform-settings", async (req: AuthRequest, res) => {
     .refine(
       (d) =>
         d.usdtToInrRate !== undefined ||
+        d.minUsdtDeposit !== undefined ||
         d.todayInrBonusPercent !== undefined ||
         d.referralCommissionPercent !== undefined,
       { message: "Provide at least one setting to update" }
@@ -316,6 +326,9 @@ adminRouter.patch("/platform-settings", async (req: AuthRequest, res) => {
   }
   if (parsed.data.usdtToInrRate !== undefined) {
     await setUsdtToInrRate(parsed.data.usdtToInrRate);
+  }
+  if (parsed.data.minUsdtDeposit !== undefined) {
+    await setMinUsdtDeposit(parsed.data.minUsdtDeposit);
   }
   if (parsed.data.todayInrBonusPercent !== undefined) {
     const { setTodayInrBonusPercent } = await import("../lib/appSettings.js");
@@ -399,7 +412,7 @@ adminRouter.get("/stats", async (_req, res) => {
   const [users, pendingDeposits, pendingPayouts, openChats] = await Promise.all([
     User.countDocuments(),
     Purchase.countDocuments(adminDepositsQuery("PENDING")),
-    Payout.countDocuments({ status: "REQUESTED" }),
+    Payout.countDocuments(withdrawalPayoutFilter("REQUESTED")),
     SupportConversation.countDocuments({ status: "OPEN" }),
   ]);
   res.json({ users, pendingDeposits, pendingPayouts, openChats });
@@ -483,7 +496,19 @@ adminRouter.patch("/plans/:id", async (req, res) => {
 });
 
 adminRouter.delete("/plans/:id", async (req, res) => {
-  await Plan.findByIdAndDelete(req.params.id);
+  const id = String(req.params.id);
+  const used = await Purchase.countDocuments({ planId: id });
+  if (used > 0) {
+    res.status(400).json({
+      error: `Cannot delete: ${used} deposit order(s) use this plan. Set inactive instead.`,
+    });
+    return;
+  }
+  const deleted = await Plan.findByIdAndDelete(id);
+  if (!deleted) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
   res.status(204).send();
 });
 
@@ -571,14 +596,44 @@ adminRouter.patch("/payment-details/:id", async (req, res) => {
   res.json(serialize(item));
 });
 
+adminRouter.delete("/payment-details/:id", async (req, res) => {
+  const id = String(req.params.id);
+  const existing = await PaymentDetails.findById(id);
+  if (!existing) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const [orderUse, planUse] = await Promise.all([
+    Purchase.countDocuments({ paymentDetailsId: id }),
+    Plan.countDocuments({ paymentDetailsId: id }),
+  ]);
+  if (orderUse > 0 || planUse > 0) {
+    res.status(400).json({
+      error: `Cannot delete: used by ${orderUse} order(s) and ${planUse} plan(s).`,
+    });
+    return;
+  }
+  await PaymentDetails.findByIdAndDelete(id);
+  res.status(204).send();
+});
+
 adminRouter.get("/deposits", async (req, res) => {
   const status = req.query.status as string | undefined;
   const filter = adminDepositsQuery(status);
-  const deposits = await Purchase.find(filter)
-    .sort({ createdAt: -1 })
-    .populate("userId", "uid email mobile name")
-    .populate("planId", "name");
-  res.json(deposits.map(formatDepositAdmin));
+  const { page, limit, skip } = parsePaginationQuery(req.query as Record<string, unknown>, {
+    defaultLimit: 20,
+    maxLimit: 100,
+  });
+  const [total, deposits] = await Promise.all([
+    Purchase.countDocuments(filter),
+    Purchase.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("userId", "uid email mobile name")
+      .populate("planId", "name"),
+  ]);
+  res.json(paginated(deposits.map(formatDepositAdmin), page, limit, total));
 });
 
 adminRouter.post("/deposits/:id/approve", async (req, res) => {
@@ -610,10 +665,16 @@ adminRouter.post("/deposits/:id/reject", async (req, res) => {
 });
 
 adminRouter.get("/payouts", async (req, res) => {
-  const status = req.query.status as string | undefined;
-  const filter = status ? { status } : {};
-  const payouts = await Payout.find(filter).sort({ createdAt: -1 }).populate("userId");
-  res.json(payouts.map(formatPayoutAdmin));
+  const filter = buildAdminPayoutFilter(req.query as Record<string, unknown>);
+  const { page, limit, skip } = parsePaginationQuery(req.query as Record<string, unknown>, {
+    defaultLimit: 20,
+    maxLimit: 100,
+  });
+  const [total, payouts] = await Promise.all([
+    Payout.countDocuments(filter),
+    Payout.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate("userId"),
+  ]);
+  res.json(paginated(payouts.map(formatPayoutAdmin), page, limit, total));
 });
 
 adminRouter.post("/payouts/:id/paid", async (req, res) => {
@@ -628,7 +689,7 @@ adminRouter.post("/payouts/:id/paid", async (req, res) => {
   }
 
   const payout = await Payout.findById(req.params.id);
-  if (!payout || payout.status !== "REQUESTED") {
+  if (!payout || payout.status !== "REQUESTED" || !isWithdrawalPayout(payout)) {
     res.status(400).json({ error: "Invalid payout" });
     return;
   }
@@ -638,17 +699,15 @@ adminRouter.post("/payouts/:id/paid", async (req, res) => {
     return;
   }
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
-    const user = await User.findById(payout.userId).session(session);
+  await runWithTransaction(async (session) => {
+    const user = await User.findById(payout.userId).session(session ?? null);
     if (!user) throw new Error("User not found");
 
     await releaseHold(idStr(user), amt, session);
     const balanceAfter = user.balance - amt;
     user.balance = balanceAfter;
     user.held = Math.max(0, user.held - amt);
-    await user.save({ session });
+    await user.save(session ? { session } : undefined);
 
     await LedgerEntry.create(
       [
@@ -661,21 +720,85 @@ adminRouter.post("/payouts/:id/paid", async (req, res) => {
           note: parsed.data.transactionRef,
         },
       ],
-      { session }
+      session ? { session } : undefined
     );
 
     payout.status = "PAID";
     payout.transactionRef = parsed.data.transactionRef;
     payout.adminNote = parsed.data.adminNote;
     payout.paidAt = new Date();
-    await payout.save({ session });
+    await payout.save(session ? { session } : undefined);
+  });
 
-    await session.commitTransaction();
+  const updated = await Payout.findById(payout._id).populate("userId");
+  res.json(formatPayoutAdmin(updated!));
+});
+
+/** Admin paid user (bank/UPI) after plan purchase — debit wallet & record withdrawal in ledger. */
+adminRouter.post("/payouts/:id/plan-pay-out", async (req, res) => {
+  const schema = z.object({
+    amount: z.number().positive(),
+    transactionRef: z.string().min(2).optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const payout = await Payout.findById(req.params.id);
+  if (!payout || payout.entryType !== "PLAN_PURCHASE" || payout.status !== "CREDITED") {
+    res.status(400).json({ error: "Invalid plan purchase record or already paid out" });
+    return;
+  }
+
+  const amt = Math.round(parsed.data.amount * 100) / 100;
+  const ref = parsed.data.transactionRef?.trim() || `PLAN-PO-${idStr(payout)}`;
+  const planLabel = payout.planName ?? "Plan";
+
+  try {
+    await runWithTransaction(async (session) => {
+      const userId = payout.userId.toString();
+      await debitWallet(
+        userId,
+        amt,
+        "PAYOUT_DEBIT",
+        idStr(payout),
+        ref ? `Withdrawal · ${ref}` : `Withdrawal · ${planLabel}`,
+        session
+      );
+
+      const user = await User.findById(payout.userId).session(session ?? null);
+      payout.status = "PAID";
+      payout.paidOutAmount = amt;
+      payout.transactionRef = ref;
+      payout.paidAt = new Date();
+      if (user) {
+        payout.walletBalance = user.balance;
+        payout.walletHeld = user.held;
+      }
+      payout.adminNote = `Paid ₹${amt} to user bank · ${planLabel}`;
+      await payout.save(session ? { session } : undefined);
+
+      await Payout.create(
+        [
+          {
+            userId: payout.userId,
+            entryType: "WITHDRAWAL",
+            status: "PAID",
+            amount: amt,
+            transactionRef: ref,
+            bankSnapshot: payout.bankSnapshot,
+            adminNote: `Admin payout (plan: ${planLabel})`,
+            paidAt: new Date(),
+          },
+        ],
+        session ? { session } : undefined
+      );
+    });
   } catch (e) {
-    await session.abortTransaction();
-    throw e;
-  } finally {
-    session.endSession();
+    res.status(400).json({ error: e instanceof Error ? e.message : "Payout failed" });
+    return;
   }
 
   const updated = await Payout.findById(payout._id).populate("userId");
@@ -684,7 +807,7 @@ adminRouter.post("/payouts/:id/paid", async (req, res) => {
 
 adminRouter.post("/payouts/:id/reject", async (req, res) => {
   const payout = await Payout.findById(req.params.id);
-  if (!payout || payout.status !== "REQUESTED") {
+  if (!payout || payout.status !== "REQUESTED" || !isWithdrawalPayout(payout)) {
     res.status(400).json({ error: "Invalid payout" });
     return;
   }
@@ -693,26 +816,18 @@ adminRouter.post("/payouts/:id/reject", async (req, res) => {
     res.status(400).json({ error: "Invalid payout amount" });
     return;
   }
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
+  await runWithTransaction(async (session) => {
     await releaseHold(payout.userId.toString(), amt, session);
     payout.status = "REJECTED";
     payout.adminNote = (req.body as { adminNote?: string })?.adminNote;
-    await payout.save({ session });
-    await session.commitTransaction();
-  } catch (e) {
-    await session.abortTransaction();
-    throw e;
-  } finally {
-    session.endSession();
-  }
+    await payout.save(session ? { session } : undefined);
+  });
   res.json(serialize(await Payout.findById(payout._id)));
 });
 
 adminRouter.get("/users", async (req: AuthRequest, res) => {
   try {
-    res.json(await getAdminUsersPage(req.user!.sub));
+    res.json(await getAdminUsersPage(req.user!.sub, req.query as Record<string, unknown>));
   } catch {
     res.status(404).json({ error: "Admin not found" });
   }
@@ -862,15 +977,31 @@ function formatPayoutAdmin(p: any) {
     held?: number;
     bankAccount?: object;
   } | null;
+  const entryType = p.entryType === "PLAN_PURCHASE" ? "PLAN_PURCHASE" : "WITHDRAWAL";
+  const walletAtCredit =
+    entryType === "PLAN_PURCHASE" && p.walletBalance != null
+      ? { balance: p.walletBalance, held: p.walletHeld ?? 0 }
+      : u
+        ? { balance: u.balance ?? 0, held: u.held ?? 0 }
+        : undefined;
   return {
     ...base,
+    entryType,
+    purchaseId: p.purchaseId ? idStr(p.purchaseId) : undefined,
+    planName: p.planName,
+    planCategory: p.planCategory,
+    amountPaid: p.amountPaid,
+    payCurrency: p.payCurrency,
+    creditAmountInr: p.creditAmountInr,
+    paidOutAmount: p.paidOutAmount,
+    autoApproved: Boolean(p.autoApproved),
     user: u
       ? {
           uid: u.uid,
           email: u.email,
           mobile: u.mobile,
           name: u.name,
-          wallet: { balance: u.balance ?? 0, held: u.held ?? 0 },
+          wallet: walletAtCredit ?? { balance: u.balance ?? 0, held: u.held ?? 0 },
           bankAccount: u.bankAccount,
         }
       : null,

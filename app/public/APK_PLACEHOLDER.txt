@@ -1,0 +1,4 @@
+Place the release Android package here as silverpay.apk
+(or set VITE_APK_DOWNLOAD_URL to a hosted APK URL).
+
+Generate: see docs/APK_BUILD.md — APP_URL=https://your-app npm run build:apk

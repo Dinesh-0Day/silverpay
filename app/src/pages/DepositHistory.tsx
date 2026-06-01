@@ -1,8 +1,12 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { userApi, type Deposit } from "../api";
+import { userApi, getErrorMessage, type Deposit } from "../api";
+import type { PaginationMeta } from "../lib/pagination";
 import { formatPlanAmount, formatWalletInr } from "../lib/currency";
 import PageStatus from "../components/PageStatus";
-import { usePageLoad } from "../hooks/usePageLoad";
+import PaginationBar from "../components/PaginationBar";
+
+const PAGE_SIZE = 20;
 
 function depositStatusMeta(status: string) {
   switch (status) {
@@ -39,7 +43,29 @@ function depositAmountLabel(d: Deposit) {
 }
 
 export default function DepositHistory() {
-  const { data: deposits, loading, error, reload } = usePageLoad(() => userApi.deposits(), []);
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
+  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = (p = page) => {
+    setLoading(true);
+    setError("");
+    return userApi
+      .deposits({ page: p, limit: PAGE_SIZE })
+      .then((res) => {
+        setDeposits(res.items);
+        setPagination(res.pagination);
+        setPage(res.pagination.page);
+      })
+      .catch((e) => setError(getErrorMessage(e)))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    void load(page);
+  }, [page]);
 
   return (
     <div className="deposit-history-page">
@@ -51,8 +77,8 @@ export default function DepositHistory() {
         <p>All your INR and crypto deposit orders</p>
       </header>
 
-      <PageStatus loading={loading} error={error} onRetry={reload}>
-        {!deposits?.length ? (
+      <PageStatus loading={loading} error={error} onRetry={() => load(page)}>
+        {!deposits.length && !loading ? (
           <div className="deposit-history-empty">
             <span aria-hidden>📭</span>
             <p>No deposits yet</p>
@@ -61,34 +87,37 @@ export default function DepositHistory() {
             </Link>
           </div>
         ) : (
-          <div className="deposit-history-list">
-            {deposits.map((d) => {
-              const st = depositStatusMeta(d.status);
-              const amt = depositAmountLabel(d);
-              const isCrypto = d.planCategory === "CRYPTO";
-              return (
-                <article key={d.id} className="deposit-history-card">
-                  <div className="deposit-history-card-top">
-                    <div className="deposit-history-card-id">
-                      <span className={`deposit-history-type ${isCrypto ? "is-crypto" : "is-inr"}`}>
-                        {isCrypto ? "Crypto" : "INR"}
-                      </span>
-                      <span className="deposit-history-ref">{d.orderNo}</span>
+          <>
+            <div className="deposit-history-list">
+              {deposits.map((d) => {
+                const st = depositStatusMeta(d.status);
+                const amt = depositAmountLabel(d);
+                const isCrypto = d.planCategory === "CRYPTO";
+                return (
+                  <article key={d.id} className="deposit-history-card">
+                    <div className="deposit-history-card-top">
+                      <div className="deposit-history-card-id">
+                        <span className={`deposit-history-type ${isCrypto ? "is-crypto" : "is-inr"}`}>
+                          {isCrypto ? "Crypto" : "INR"}
+                        </span>
+                        <span className="deposit-history-ref">{d.orderNo}</span>
+                      </div>
+                      <span className={`deposit-history-badge ${st.className}`}>{st.text}</span>
                     </div>
-                    <span className={`deposit-history-badge ${st.className}`}>{st.text}</span>
-                  </div>
 
-                  <div className="deposit-history-card-body">
-                    <div>
-                      <p className="deposit-history-amount">{amt.primary}</p>
-                      <p className="deposit-history-sub">{amt.sub}</p>
+                    <div className="deposit-history-card-body">
+                      <div>
+                        <p className="deposit-history-amount">{amt.primary}</p>
+                        <p className="deposit-history-sub">{amt.sub}</p>
+                      </div>
+                      <p className="deposit-history-time">{formatWhen(d.createdAt)}</p>
                     </div>
-                    <p className="deposit-history-time">{formatWhen(d.createdAt)}</p>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                  </article>
+                );
+              })}
+            </div>
+            {pagination && <PaginationBar pagination={pagination} onPageChange={setPage} />}
+          </>
         )}
       </PageStatus>
     </div>

@@ -3,3 +3,4 @@ dist/
 .env
 .DS_Store
 backend/uploads/
+app/android-twa/

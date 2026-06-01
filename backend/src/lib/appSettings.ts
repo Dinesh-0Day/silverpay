@@ -7,6 +7,11 @@ function defaultRateFromEnv() {
   return Number.isFinite(n) && n > 0 ? n : 83;
 }
 
+function defaultMinUsdtFromEnv() {
+  const n = Number(process.env.MIN_USDT_DEPOSIT);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
 export async function getUsdtToInrRate(): Promise<number> {
   const doc = await AppSettings.findOne({ key: SETTINGS_KEY });
   if (doc?.usdtToInrRate && doc.usdtToInrRate > 0) return doc.usdtToInrRate;
@@ -54,11 +59,38 @@ export async function setReferralCommissionPercent(percent: number) {
   );
 }
 
+export async function getMinUsdtDeposit(): Promise<number> {
+  const doc = await AppSettings.findOne({ key: SETTINGS_KEY });
+  const n = Number(doc?.minUsdtDeposit);
+  if (!Number.isFinite(n) || n <= 0) return defaultMinUsdtFromEnv();
+  return Math.round(n * 100) / 100;
+}
+
+export async function setMinUsdtDeposit(amount: number) {
+  const value = Math.round(Math.max(0.01, amount) * 100) / 100;
+  return AppSettings.findOneAndUpdate(
+    { key: SETTINGS_KEY },
+    { minUsdtDeposit: value },
+    { upsert: true, new: true }
+  );
+}
+
+export function minUsdtDepositError(amount: number, min: number) {
+  return `Minimum deposit is ${min} USDT (you entered ${amount} USDT)`;
+}
+
 export async function getPlatformSettings() {
   const rate = await getUsdtToInrRate();
   const todayInrBonusPercent = await getTodayInrBonusPercent();
   const referralCommissionPercent = await getReferralCommissionPercent();
+  const minUsdtDeposit = await getMinUsdtDeposit();
   const { getHomeBanner } = await import("./homeBanner.js");
   const homeBanner = await getHomeBanner();
-  return { usdtToInrRate: rate, todayInrBonusPercent, referralCommissionPercent, homeBanner };
+  return {
+    usdtToInrRate: rate,
+    todayInrBonusPercent,
+    referralCommissionPercent,
+    minUsdtDeposit,
+    homeBanner,
+  };
 }

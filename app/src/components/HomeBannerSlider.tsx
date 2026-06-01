@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { HomeBannerSlide } from "../api";
-
-function resolveImageUrl(url: string) {
-  if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  return url.startsWith("/") ? url : `/${url}`;
-}
+import { resolveMediaUrl } from "../lib/apiBase";
 
 type Props = {
   slides: HomeBannerSlide[];
@@ -43,7 +38,7 @@ export default function HomeBannerSlider({ slides, onSlideClick }: Props) {
     <div className="home-banner-slider">
       <div ref={trackRef} className="home-banner-track">
         {slides.map((slide) => {
-          const imageSrc = slide.imageUrl ? resolveImageUrl(slide.imageUrl) : "";
+          const imageSrc = slide.imageUrl ? resolveMediaUrl(slide.imageUrl) : "";
           return (
             <button
               key={slide.id}

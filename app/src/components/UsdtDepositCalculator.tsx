@@ -8,6 +8,7 @@ type Props = {
 
 export default function UsdtDepositCalculator({ buyLoading, onCreateOrder }: Props) {
   const [rate, setRate] = useState(0);
+  const [minUsdt, setMinUsdt] = useState(1);
   const [amountInput, setAmountInput] = useState("");
   const [preview, setPreview] = useState<CryptoCalcResult | null>(null);
   const [calcError, setCalcError] = useState("");
@@ -16,16 +17,19 @@ export default function UsdtDepositCalculator({ buyLoading, onCreateOrder }: Pro
   useEffect(() => {
     userApi
       .cryptoSettings()
-      .then((s) => setRate(s.usdtToInrRate ?? 0))
+      .then((s) => {
+        setRate(s.usdtToInrRate ?? 0);
+        setMinUsdt(s.minUsdtDeposit > 0 ? s.minUsdtDeposit : 1);
+      })
       .catch(() => undefined);
   }, []);
 
   useEffect(() => {
     const raw = amountInput.trim();
     const amount = Number(raw);
-    if (!raw || !Number.isFinite(amount) || amount < 1) {
+    if (!raw || !Number.isFinite(amount) || amount < minUsdt) {
       setPreview(null);
-      setCalcError(raw && amount < 1 ? "Minimum 1 USDT" : "");
+      setCalcError(raw && amount < minUsdt ? `Minimum ${minUsdt} USDT` : "");
       return;
     }
 
@@ -37,6 +41,7 @@ export default function UsdtDepositCalculator({ buyLoading, onCreateOrder }: Pro
         .then((res) => {
           setPreview(res);
           setRate(res.usdtToInrRate);
+          if (res.minUsdtDeposit && res.minUsdtDeposit > 0) setMinUsdt(res.minUsdtDeposit);
         })
         .catch((e) => {
           setPreview(null);
@@ -46,10 +51,10 @@ export default function UsdtDepositCalculator({ buyLoading, onCreateOrder }: Pro
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [amountInput]);
+  }, [amountInput, minUsdt]);
 
   const amount = Number(amountInput);
-  const canCreate = Number.isFinite(amount) && amount >= 1 && preview && !calcError;
+  const canCreate = Number.isFinite(amount) && amount >= minUsdt && preview && !calcError;
 
   return (
     <section className="usdt-calc" aria-label="USDT deposit calculator">
@@ -60,15 +65,17 @@ export default function UsdtDepositCalculator({ buyLoading, onCreateOrder }: Pro
         </strong>
       </div>
 
+      <p className="usdt-calc-min-hint">Minimum deposit: {minUsdt} USDT</p>
+
       <label className="usdt-calc-field">
         <span className="usdt-calc-field-label">USDT amount to sell</span>
         <div className="usdt-calc-input-wrap">
           <input
             type="number"
             inputMode="decimal"
-            min={1}
+            min={minUsdt}
             step="0.01"
-            placeholder="Enter USDT amount"
+            placeholder={`Min ${minUsdt} USDT`}
             value={amountInput}
             onChange={(e) => setAmountInput(e.target.value)}
             className="usdt-calc-input"

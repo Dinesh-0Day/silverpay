@@ -70,7 +70,14 @@ Change admin email/password later: admin panel → **Settings** (requires curren
 
 In admin **Settings → Home popup**, enable a dialog with title, message, and/or image. Users see it on the Home screen after login and can close it. Saving a new version shows it again to users who dismissed the previous one.
 
-## URLs
+## Deploy on Railway (production)
+
+Full guide: **[docs/RAILWAY_DEPLOY.md](docs/RAILWAY_DEPLOY.md)**
+
+Three services from one repo: `backend`, `app`, `admin` + **MongoDB Atlas**.  
+Template env: [.env.railway.example](.env.railway.example)
+
+## URLs (local)
 
 | Service | URL |
 |---------|-----|

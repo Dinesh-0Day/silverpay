@@ -1,11 +1,6 @@
 import { useEffect } from "react";
 import type { HomeBannerSlide } from "../api";
-
-function resolveImageUrl(url: string) {
-  if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  return url.startsWith("/") ? url : `/${url}`;
-}
+import { resolveMediaUrl } from "../lib/apiBase";
 
 type Props = {
   slide: HomeBannerSlide;
@@ -20,7 +15,7 @@ export default function HomeBannerDrawer({ slide, onClose }: Props) {
     };
   }, []);
 
-  const imageSrc = slide.imageUrl ? resolveImageUrl(slide.imageUrl) : "";
+  const imageSrc = slide.imageUrl ? resolveMediaUrl(slide.imageUrl) : "";
 
   return (
     <div className="home-banner-drawer-backdrop" onClick={onClose}>

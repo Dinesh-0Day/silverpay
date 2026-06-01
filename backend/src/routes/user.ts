@@ -14,8 +14,17 @@ import {
 } from "../models/index.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { enrichPlanForUser, categoryFilter, normalizePlanCategory } from "../lib/plans.js";
-import { getTodayInrBonusPercent, getUsdtToInrRate, getPlatformSettings } from "../lib/appSettings.js";
+import {
+  getMinUsdtDeposit,
+  getPlatformSettings,
+  getTodayInrBonusPercent,
+  getUsdtToInrRate,
+  minUsdtDepositError,
+} from "../lib/appSettings.js";
+import { getHomeDepositDashboardStats } from "../lib/homeDepositStats.js";
 import { getHomeWalletSummary } from "../lib/homeWallet.js";
+import { paginated, parsePaginationQuery } from "../lib/pagination.js";
+import { runWithTransaction } from "../lib/mongoTransaction.js";
 import { getHomePromo } from "../lib/homePromo.js";
 import {
   claimNewbieReward,
@@ -31,6 +40,11 @@ import { approvePurchase } from "../lib/purchaseApproval.js";
 import { verifyCryptoPayment } from "../lib/cryptoVerify.js";
 import { checkPaytmOrderStatus } from "../lib/paytm.js";
 import { resolvePaymentAccount } from "../lib/resolvePayment.js";
+import {
+  listManualPaymentAccounts,
+  listPaytmAutoPaymentAccounts,
+  pickRotatingPaymentAccount,
+} from "../lib/paymentRotation.js";
 import { createPurchaseRecord } from "../lib/createPurchase.js";
 import { cancelPendingPurchase } from "../lib/cancelPurchase.js";
 import { generateUniqueReferralCode } from "../lib/referral.js";
@@ -76,28 +90,9 @@ userRouter.get("/me", async (req: AuthRequest, res) => {
   });
 });
 
-/** UPI: manual vs automatic availability */
+/** UPI: manual vs automatic availability (lists all; deposit uses round-robin pick). */
 userRouter.get("/payment-options", async (_req, res) => {
-  const upiChannel = {
-    $or: [{ paymentChannel: "UPI" }, { paymentChannel: { $exists: false } }, { paymentChannel: null }],
-  };
-  const upiIdReady = { upiId: { $exists: true, $ne: "" } };
-
-  const [manualDocs, autoDocs] = await Promise.all([
-    PaymentDetails.find({
-      isActive: true,
-      ...upiIdReady,
-      settlementMode: { $nin: ["PAYTM_AUTO", "CRYPTO_AUTO"] },
-      ...upiChannel,
-    }).sort({ isDefault: -1, createdAt: -1 }),
-    PaymentDetails.find({
-      isActive: true,
-      ...upiIdReady,
-      settlementMode: "PAYTM_AUTO",
-      paytmMerchantId: { $exists: true, $ne: "" },
-      ...upiChannel,
-    }).sort({ isDefault: -1, createdAt: -1 }),
-  ]);
+  const [manualDocs, autoDocs] = await Promise.all([listManualPaymentAccounts(), listPaytmAutoPaymentAccounts()]);
 
   const manual = manualDocs
     .filter((d) => Boolean(d.upiId?.trim()))
@@ -115,9 +110,7 @@ userRouter.get("/payment-options", async (_req, res) => {
 });
 
 userRouter.get("/payment-details", async (_req, res) => {
-  const details =
-    (await PaymentDetails.findOne({ isActive: true, isDefault: true })) ??
-    (await PaymentDetails.findOne({ isActive: true }));
+  const details = await pickRotatingPaymentAccount("MANUAL");
   if (!details) {
     res.status(503).json({ error: "Payment details not configured" });
     return;
@@ -152,8 +145,9 @@ userRouter.get("/plans", async (req: AuthRequest, res) => {
 /** Crypto calculator preview (uses first active crypto plan bonus rules) */
 userRouter.get("/crypto-calculator", async (req: AuthRequest, res) => {
   const amount = Number(req.query.amount);
-  if (!amount || amount < 1) {
-    res.status(400).json({ error: "Enter a valid amount" });
+  const minUsdt = await getMinUsdtDeposit();
+  if (!amount || amount < minUsdt) {
+    res.status(400).json({ error: amount ? minUsdtDepositError(amount, minUsdt) : "Enter a valid amount" });
     return;
   }
   const template = await Plan.findOne({ isActive: true, planCategory: "CRYPTO" }).sort({ sortOrder: 1 });
@@ -166,6 +160,7 @@ userRouter.get("/crypto-calculator", async (req: AuthRequest, res) => {
   res.json({
     amount,
     currency: "USDT",
+    minUsdtDeposit: minUsdt,
     usdtToInrRate,
     bonusPercent: template.bonusPercent,
     bonusFixed: template.bonusFixed,
@@ -221,8 +216,12 @@ userRouter.post("/newbie-rewards/:rewardId/claim", async (req: AuthRequest, res)
 
 /** Home wallet card: USDT rate & today's INR bonus (admin-set) */
 userRouter.get("/home-info", async (req: AuthRequest, res) => {
-  const wallet = await getHomeWalletSummary(req.user!.sub);
-  const promo = await getHomePromo();
+  const userId = req.user!.sub;
+  const [wallet, promo, depositDashboard] = await Promise.all([
+    getHomeWalletSummary(userId),
+    getHomePromo(),
+    getHomeDepositDashboardStats(userId),
+  ]);
   res.json({
     usdtToInrRate: await getUsdtToInrRate(),
     todayInrBonusPercent: await getTodayInrBonusPercent(),
@@ -231,6 +230,7 @@ userRouter.get("/home-info", async (req: AuthRequest, res) => {
     withdrawalTotal: wallet.withdrawalTotal,
     commission: wallet.commission,
     commissionTotal: wallet.commission.total,
+    depositDashboard,
     promo: promo.enabled && promo.imageUrl ? promo : { enabled: false, imageUrl: "", linkUrl: "" },
   });
 });
@@ -305,6 +305,14 @@ userRouter.post("/deposits", async (req: AuthRequest, res) => {
   if (!isCustomAmount && enriched.isLocked) {
     res.status(403).json({ error: "Plan is locked", lockReason: enriched.lockReason });
     return;
+  }
+
+  if (planCategory === "CRYPTO") {
+    const minUsdt = await getMinUsdtDeposit();
+    if (amount < minUsdt) {
+      res.status(400).json({ error: minUsdtDepositError(amount, minUsdt) });
+      return;
+    }
   }
 
   let settlementMode: SettlementMode;
@@ -671,10 +679,17 @@ userRouter.post("/deposits/:id/cancel-expired", async (req: AuthRequest, res) =>
 });
 
 userRouter.get("/deposits", async (req: AuthRequest, res) => {
-  const purchases = await Purchase.find({ userId: req.user!.sub })
-    .sort({ createdAt: -1 })
-    .populate("planId");
-  res.json(purchases.map(formatDeposit));
+  const userId = req.user!.sub;
+  const { page, limit, skip } = parsePaginationQuery(req.query as Record<string, unknown>, {
+    defaultLimit: 20,
+    maxLimit: 50,
+  });
+  const filter = { userId };
+  const [total, purchases] = await Promise.all([
+    Purchase.countDocuments(filter),
+    Purchase.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate("planId"),
+  ]);
+  res.json(paginated(purchases.map(formatDeposit), page, limit, total));
 });
 
 userRouter.get("/deposits/:id/payment-details", async (req: AuthRequest, res) => {
@@ -798,11 +813,9 @@ userRouter.post("/payouts", async (req: AuthRequest, res) => {
     return;
   }
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
+  const payout = await runWithTransaction(async (session) => {
     await holdFunds(idStr(user), parsed.data.amount, session);
-    const [payout] = await Payout.create(
+    const [created] = await Payout.create(
       [
         {
           userId: user._id,
@@ -811,21 +824,27 @@ userRouter.post("/payouts", async (req: AuthRequest, res) => {
           bankSnapshot: JSON.stringify(user.bankAccount),
         },
       ],
-      { session }
+      session ? { session } : undefined
     );
-    await session.commitTransaction();
-    res.status(201).json(serialize(payout));
-  } catch (e) {
-    await session.abortTransaction();
-    throw e;
-  } finally {
-    session.endSession();
-  }
+    return created;
+  });
+  res.status(201).json(serialize(payout));
 });
 
 userRouter.get("/payouts", async (req: AuthRequest, res) => {
-  const payouts = await Payout.find({ userId: req.user!.sub }).sort({ createdAt: -1 });
-  res.json(serializeList(payouts));
+  const userId = req.user!.sub;
+  const status = typeof req.query.status === "string" ? req.query.status : undefined;
+  const filter: Record<string, unknown> = { userId };
+  if (status) filter.status = status;
+  const { page, limit, skip } = parsePaginationQuery(req.query as Record<string, unknown>, {
+    defaultLimit: 20,
+    maxLimit: 50,
+  });
+  const [total, payouts] = await Promise.all([
+    Payout.countDocuments(filter),
+    Payout.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+  ]);
+  res.json(paginated(serializeList(payouts), page, limit, total));
 });
 
 userRouter.get("/support/messages", async (req: AuthRequest, res) => {

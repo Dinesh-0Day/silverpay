@@ -1,7 +1,9 @@
 import { requestApi, type ApiRequestOptions } from "./lib/http";
 import { parseApiErrorBody } from "./lib/errors";
+import { listQuery, type Paginated, type PaginationMeta } from "./lib/pagination";
+import { API, apiFetchUrl } from "./lib/apiBase";
 
-const API = "/api";
+export type { Paginated, PaginationMeta };
 
 function headers() {
   const token = localStorage.getItem("adminToken");
@@ -33,9 +35,12 @@ export const adminApi = {
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
   platformSettings: () =>
-    api<{ usdtToInrRate: number; todayInrBonusPercent: number; referralCommissionPercent: number }>(
-      "/admin/platform-settings"
-    ),
+    api<{
+      usdtToInrRate: number;
+      minUsdtDeposit: number;
+      todayInrBonusPercent: number;
+      referralCommissionPercent: number;
+    }>("/admin/platform-settings"),
   smsSettings: () =>
     api<{ enabled: boolean; configured: boolean; apiKeyMasked: string; provider: string }>("/admin/sms-settings"),
   updateSmsSettings: (body: {
@@ -50,11 +55,17 @@ export const adminApi = {
     }),
   updatePlatformSettings: (body: {
     usdtToInrRate?: number;
+    minUsdtDeposit?: number;
     todayInrBonusPercent?: number;
     referralCommissionPercent?: number;
     currentPassword: string;
   }) =>
-    api<{ usdtToInrRate: number; todayInrBonusPercent: number; referralCommissionPercent: number }>(
+    api<{
+      usdtToInrRate: number;
+      minUsdtDeposit: number;
+      todayInrBonusPercent: number;
+      referralCommissionPercent: number;
+    }>(
       "/admin/platform-settings",
       {
         method: "PATCH",
@@ -88,7 +99,7 @@ export const adminApi = {
     const token = localStorage.getItem("adminToken");
     const fd = new FormData();
     fd.append("image", file);
-    const res = await fetch("/api/admin/home-promo/upload", {
+    const res = await fetch(apiFetchUrl("/api/admin/home-promo/upload"), {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: fd,
@@ -111,7 +122,7 @@ export const adminApi = {
     const token = localStorage.getItem("adminToken");
     const fd = new FormData();
     fd.append("image", file);
-    const res = await fetch("/api/admin/home-banner/upload", {
+    const res = await fetch(apiFetchUrl("/api/admin/home-banner/upload"), {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: fd,
@@ -124,20 +135,31 @@ export const adminApi = {
   plans: () => api<Plan[]>("/admin/plans"),
   createPlan: (body: Partial<Plan>) => api<Plan>("/admin/plans", { method: "POST", body: JSON.stringify(body) }),
   updatePlan: (id: string, body: Partial<Plan>) => api<Plan>(`/admin/plans/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deletePlan: (id: string) => api<void>(`/admin/plans/${id}`, { method: "DELETE" }),
   paymentDetails: () => api<PaymentDetails[]>("/admin/payment-details"),
   createPaymentDetails: (body: Partial<PaymentDetails>) =>
     api<PaymentDetails>("/admin/payment-details", { method: "POST", body: JSON.stringify(body) }),
-  deposits: (status?: string) => api<Deposit[]>(`/admin/deposits${status ? `?status=${status}` : ""}`),
+  updatePaymentDetails: (id: string, body: Partial<PaymentDetails>) =>
+    api<PaymentDetails>(`/admin/payment-details/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deletePaymentDetails: (id: string) => api<void>(`/admin/payment-details/${id}`, { method: "DELETE" }),
+  deposits: (opts?: { status?: string; page?: number; limit?: number }) =>
+    api<Paginated<Deposit>>(`/admin/deposits${listQuery(opts)}`),
   approveDeposit: (id: string, adminNote?: string) =>
     api(`/admin/deposits/${id}/approve`, { method: "POST", body: JSON.stringify({ adminNote }) }),
   rejectDeposit: (id: string, adminNote?: string) =>
     api(`/admin/deposits/${id}/reject`, { method: "POST", body: JSON.stringify({ adminNote }) }),
-  payouts: (status?: string) => api<Payout[]>(`/admin/payouts${status ? `?status=${status}` : ""}`),
+  payouts: (opts?: { status?: string; entryType?: string; page?: number; limit?: number }) =>
+    api<Paginated<Payout>>(`/admin/payouts${listQuery(opts)}`),
   markPayoutPaid: (id: string, transactionRef: string, adminNote?: string) =>
     api(`/admin/payouts/${id}/paid`, { method: "POST", body: JSON.stringify({ transactionRef, adminNote }) }),
+  planPurchasePayOut: (id: string, amount: number, transactionRef?: string) =>
+    api<Payout>(`/admin/payouts/${id}/plan-pay-out`, {
+      method: "POST",
+      body: JSON.stringify({ amount, transactionRef }),
+    }),
   rejectPayout: (id: string, adminNote?: string) =>
     api(`/admin/payouts/${id}/reject`, { method: "POST", body: JSON.stringify({ adminNote }) }),
-  users: () => api<AdminUsersPage>("/admin/users"),
+  users: (opts?: { page?: number; limit?: number }) => api<AdminUsersPage>(`/admin/users${listQuery(opts)}`),
   setVip: (id: string, isVip: boolean) => api(`/admin/users/${id}/vip`, { method: "PATCH", body: JSON.stringify({ isVip }) }),
   supportConversations: () => api<SupportConv[]>("/admin/support/conversations"),
   supportChat: (userId: string) => api<SupportConvDetail>(`/admin/support/conversations/${userId}`),
@@ -265,15 +287,26 @@ export type Deposit = {
 
 export type Payout = {
   id: string;
+  entryType?: "WITHDRAWAL" | "PLAN_PURCHASE";
+  purchaseId?: string;
   amount: number;
   status: string;
   transactionRef?: string;
   createdAt: string;
   bankSnapshot?: string;
+  planName?: string;
+  planCategory?: string;
+  amountPaid?: number;
+  payCurrency?: string;
+  creditAmountInr?: number;
+  paidOutAmount?: number;
+  autoApproved?: boolean;
+  adminNote?: string;
   user: {
     uid: string;
     email?: string;
     mobile?: string;
+    name?: string;
     wallet?: { balance: number; held: number };
     bankAccount?: { accountHolder: string; accountNumber: string; ifsc: string; bankName: string; upiId?: string };
   };
@@ -307,7 +340,8 @@ export type AdminUsersPage = {
     referralCode: string;
     createdAt?: string;
   };
-  users: UserRow[];
+  items: UserRow[];
+  pagination: PaginationMeta;
 };
 
 export type SupportMessage = {

@@ -1,7 +1,7 @@
 import { normalizeIndianMobile } from "./lib/phone";
 import { requestApi, type ApiRequestOptions } from "./lib/http";
-
-const API = "/api";
+import { listQuery, type Paginated } from "./lib/pagination";
+import { API } from "./lib/apiBase";
 
 function mobileForApi(raw: string) {
   const mobile = normalizeIndianMobile(raw);
@@ -54,7 +54,8 @@ export const userApi = {
     api<{ manual: PaymentDetails[]; automatic: PaymentDetails[]; timerMinutes: number }>("/user/payment-options"),
   cryptoCalculator: (amount: number) =>
     api<CryptoCalcResult>(`/user/crypto-calculator?amount=${amount}`),
-  cryptoSettings: () => api<{ usdtToInrRate: number; todayInrBonusPercent?: number }>("/user/crypto-settings"),
+  cryptoSettings: () =>
+    api<{ usdtToInrRate: number; minUsdtDeposit: number; todayInrBonusPercent?: number }>("/user/crypto-settings"),
   homeInfo: () =>
     api<{
       usdtToInrRate: number;
@@ -70,6 +71,13 @@ export const userApi = {
       depositTotal: number;
       withdrawalTotal: number;
       promo: { enabled: boolean; imageUrl: string; linkUrl: string };
+      depositDashboard: {
+        pendingDeposits: number;
+        todayInrOrders: number;
+        todayInrAmount: number;
+        todayCryptoOrders: number;
+        todayCryptoWalletCredit: number;
+      };
     }>("/user/home-info"),
   newbieRewards: () => api<NewbieRewardsPayload>("/user/newbie-rewards"),
   ackNewbieRewardTelegram: (rewardId: string) =>
@@ -119,7 +127,8 @@ export const userApi = {
       method: "POST",
       body: JSON.stringify({ reason: reason ?? "user_abandoned" }),
     }),
-  deposits: () => api<Deposit[]>("/user/deposits"),
+  deposits: (opts?: { page?: number; limit?: number }) =>
+    api<Paginated<Deposit>>(`/user/deposits${listQuery(opts)}`),
   ledger: () => api<LedgerEntry[]>("/user/wallet/ledger"),
   pinStatus: () => api<{ configured: boolean }>("/user/pin"),
   setPin: (pin: string) => api<{ configured: boolean }>("/user/pin", { method: "PUT", body: JSON.stringify({ pin }) }),
@@ -128,7 +137,8 @@ export const userApi = {
   notificationsReadAll: () => api<{ success: boolean }>("/user/notifications/read-all", { method: "POST" }),
   saveBank: (bank: BankAccount) => api<BankAccount>("/user/bank-account", { method: "PUT", body: JSON.stringify(bank) }),
   createPayout: (amount: number) => api<Payout>("/user/payouts", { method: "POST", body: JSON.stringify({ amount }) }),
-  payouts: () => api<Payout[]>("/user/payouts"),
+  payouts: (opts?: { page?: number; limit?: number; status?: string }) =>
+    api<Paginated<Payout>>(`/user/payouts${listQuery(opts)}`),
   supportMessages: () => api<{ messages: SupportMessage[] }>("/user/support/messages"),
   sendSupportMessage: (body: string) =>
     api<SupportMessage>("/user/support/messages", { method: "POST", body: JSON.stringify({ body }) }),
@@ -232,6 +242,7 @@ export type PaymentSession = {
 export type CryptoCalcResult = {
   amount: number;
   currency: "USDT";
+  minUsdtDeposit?: number;
   usdtToInrRate: number;
   bonusPercent: number;
   bonusFixed: number;

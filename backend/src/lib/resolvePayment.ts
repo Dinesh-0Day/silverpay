@@ -1,4 +1,5 @@
 import { PaymentDetails, type SettlementMode } from "../models/index.js";
+import { pickRotatingPaymentAccount } from "./paymentRotation.js";
 
 export type PaymentChannel = "UPI" | "CRYPTO";
 
@@ -21,28 +22,5 @@ export async function resolvePaymentAccount(opts: {
     if (picked) return picked;
   }
 
-  if (opts.settlementMode === "MANUAL") {
-    return PaymentDetails.findOne({
-      isActive: true,
-      upiId: { $exists: true, $ne: "" },
-      settlementMode: { $nin: ["PAYTM_AUTO", "CRYPTO_AUTO"] },
-      $or: [{ paymentChannel: "UPI" }, { paymentChannel: { $exists: false } }, { paymentChannel: null }],
-    }).sort({ isDefault: -1, createdAt: -1 });
-  }
-
-  if (opts.settlementMode === "PAYTM_AUTO") {
-    return PaymentDetails.findOne({
-      isActive: true,
-      settlementMode: "PAYTM_AUTO",
-      upiId: { $exists: true, $ne: "" },
-      paytmMerchantId: { $exists: true, $ne: "" },
-      $or: [{ paymentChannel: "UPI" }, { paymentChannel: { $exists: false } }, { paymentChannel: null }],
-    }).sort({ isDefault: -1, createdAt: -1 });
-  }
-
-  return PaymentDetails.findOne({
-    isActive: true,
-    paymentChannel: opts.channel,
-    settlementMode: opts.settlementMode,
-  }).sort({ isDefault: -1, createdAt: -1 });
+  return pickRotatingPaymentAccount(opts.settlementMode);
 }

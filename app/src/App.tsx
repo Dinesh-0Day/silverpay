@@ -17,6 +17,7 @@ import Team from "./pages/Team";
 import NewbieRewards from "./pages/NewbieRewards";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
+import TopbarApkDownload from "./components/TopbarApkDownload";
 import { userApi } from "./api";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -61,6 +62,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               <span>Pay</span>
             </h1>
             <div className="app-topbar-actions">
+              <TopbarApkDownload />
               <Link
                 to="/notifications"
                 className={`app-topbar-icon-btn${unread > 0 ? " has-unread" : ""}`}

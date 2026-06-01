@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { userApi, getErrorMessage, type Deposit, type User, type HomeBannerSlide } from "../api";
+import { userApi, getErrorMessage, type User, type HomeBannerSlide } from "../api";
 import HomeBannerSlider from "../components/HomeBannerSlider";
 import HomeBannerDrawer from "../components/HomeBannerDrawer";
 import LiveTransactions from "../components/LiveTransactions";
@@ -33,43 +33,23 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const isSameDay = (iso: string, now = new Date()) => {
-    const d = new Date(iso);
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-  };
-
-  const sum = (arr: Deposit[], pick: (d: Deposit) => number) => arr.reduce((a, d) => a + pick(d), 0);
-
   const load = () => {
     setLoading(true);
     setError("");
-    return Promise.all([
-      userApi.me(),
-      userApi.plansGrouped(),
-      userApi.deposits(),
-      userApi.homeBanner(),
-      userApi.homeInfo(),
-    ])
-      .then(([u, g, deposits, b, info]) => {
+    return Promise.all([userApi.me(), userApi.plansGrouped(), userApi.homeBanner(), userApi.homeInfo()])
+      .then(([u, g, b, info]) => {
         setUser(u);
+        const dash = info.depositDashboard;
         setCounts({
           inr: g.inr.length,
           crypto: g.crypto.length,
-          pendingDeposits: deposits.filter((d) => d.status === "PENDING").length,
+          pendingDeposits: dash?.pendingDeposits ?? 0,
         });
-
-        const todayApproved = deposits.filter((d) => {
-          if (d.status !== "APPROVED") return false;
-          const when = d.approvedAt ?? d.createdAt;
-          return isSameDay(when);
-        });
-        const inr = todayApproved.filter((d) => d.planCategory !== "CRYPTO");
-        const crypto = todayApproved.filter((d) => d.planCategory === "CRYPTO");
         setToday({
-          inrOrders: inr.length,
-          inrAmount: sum(inr, (d) => d.amount ?? 0),
-          cryptoOrders: crypto.length,
-          cryptoWalletCredit: sum(crypto, (d) => d.walletCreditInr ?? d.creditAmount ?? 0),
+          inrOrders: dash?.todayInrOrders ?? 0,
+          inrAmount: dash?.todayInrAmount ?? 0,
+          cryptoOrders: dash?.todayCryptoOrders ?? 0,
+          cryptoWalletCredit: dash?.todayCryptoWalletCredit ?? 0,
         });
 
         setBannerSlides(b.enabled && b.slides.length ? b.slides : []);

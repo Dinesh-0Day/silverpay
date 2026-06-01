@@ -1,4 +1,5 @@
 import { Purchase } from "../models/index.js";
+import { recordPlanPurchasePayoutEntry } from "./planPurchasePayoutFeed.js";
 import { payReferralCommission } from "./referralCommission.js";
 import { creditWallet } from "./wallet.js";
 import { idStr } from "./serialize.js";
@@ -28,6 +29,8 @@ export async function approvePurchase(
   );
 
   await payReferralCommission(purchase);
+
+  await recordPlanPurchasePayoutEntry(idStr(purchase));
 
   return purchase;
 }

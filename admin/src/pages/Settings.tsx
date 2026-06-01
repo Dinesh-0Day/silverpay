@@ -13,6 +13,7 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [usdtToInrRate, setUsdtToInrRate] = useState("");
+  const [minUsdtDeposit, setMinUsdtDeposit] = useState("");
   const [todayInrBonusPercent, setTodayInrBonusPercent] = useState("");
   const [referralCommissionPercent, setReferralCommissionPercent] = useState("");
   const [ratePassword, setRatePassword] = useState("");
@@ -55,6 +56,7 @@ export default function Settings() {
         setEmail(p.email);
         setName(p.name || "");
         setUsdtToInrRate(String(settings.usdtToInrRate));
+        setMinUsdtDeposit(String(settings.minUsdtDeposit ?? 1));
         setTodayInrBonusPercent(String(settings.todayInrBonusPercent ?? 0));
         setReferralCommissionPercent(String(settings.referralCommissionPercent ?? 5));
         setRewardsEnabled(rewards.enabled);
@@ -101,10 +103,15 @@ export default function Settings() {
   const saveRate = async (e: React.FormEvent) => {
     e.preventDefault();
     const rate = Number(usdtToInrRate);
+    const minUsdt = Number(minUsdtDeposit);
     const bonusPercent = Number(todayInrBonusPercent);
     const referralPct = Number(referralCommissionPercent);
     if (!rate || rate <= 0) {
       setErr("Enter a valid USDT rate");
+      return;
+    }
+    if (!minUsdt || minUsdt <= 0) {
+      setErr("Enter a valid minimum USDT deposit");
       return;
     }
     if (!Number.isFinite(bonusPercent) || bonusPercent < 0 || bonusPercent > 100) {
@@ -120,11 +127,13 @@ export default function Settings() {
     try {
       const updated = await adminApi.updatePlatformSettings({
         usdtToInrRate: rate,
+        minUsdtDeposit: minUsdt,
         todayInrBonusPercent: bonusPercent,
         referralCommissionPercent: referralPct,
         currentPassword: ratePassword,
       });
       setUsdtToInrRate(String(updated.usdtToInrRate));
+      setMinUsdtDeposit(String(updated.minUsdtDeposit ?? minUsdt));
       setTodayInrBonusPercent(String(updated.todayInrBonusPercent ?? 0));
       setReferralCommissionPercent(String(updated.referralCommissionPercent ?? 5));
       setRatePassword("");
@@ -481,7 +490,8 @@ export default function Settings() {
           <SectionTitle>Home rates &amp; bonus</SectionTitle>
         </div>
         <p className="text-sm text-slate-500 mb-4">
-          USDT rate is used for crypto deposits. Today&apos;s INR bonus % is shown on the user home screen (two info boxes).
+          USDT rate is used for crypto deposits. Minimum USDT applies to custom crypto orders and fixed crypto plans.
+          Today&apos;s INR bonus % is shown on the user home screen.
           Example: 10 USDT × ₹{usdtToInrRate || "—"} = ₹
           {usdtToInrRate ? (Number(usdtToInrRate) * 10).toFixed(2) : "—"} base credit.
         </p>
@@ -496,6 +506,20 @@ export default function Settings() {
               onChange={(e) => setUsdtToInrRate(e.target.value)}
               required
             />
+          </div>
+          <div>
+            <Label>Minimum USDT deposit quantity</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={minUsdtDeposit}
+              onChange={(e) => setMinUsdtDeposit(e.target.value)}
+              required
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              Users cannot create a crypto deposit below this amount (custom USDT calculator and crypto plans).
+            </p>
           </div>
           <div>
             <Label>Today&apos;s INR bonus (%)</Label>

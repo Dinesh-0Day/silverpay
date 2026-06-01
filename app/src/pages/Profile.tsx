@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { userApi, getErrorMessage, type BankAccount, type LedgerEntry, type User } from "../api";
+import AppDownloadSection from "../components/AppDownloadSection";
 import ProfilePersonaAvatar from "../components/ProfilePersonaAvatar";
 import PageStatus from "../components/PageStatus";
 
@@ -156,6 +157,8 @@ export default function Profile() {
 
         <MenuSection title="Account" items={accountMenu} />
         <MenuSection title="More" items={moreMenu} />
+
+        <AppDownloadSection />
 
         <section className="profile-menu-section">
           <h2 className="profile-menu-title">Security</h2>

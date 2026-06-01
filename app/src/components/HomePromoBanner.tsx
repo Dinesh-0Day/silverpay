@@ -1,10 +1,5 @@
 import { Link } from "react-router-dom";
-
-function resolveImageUrl(url: string) {
-  if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  return url.startsWith("/") ? url : `/${url}`;
-}
+import { resolveMediaUrl } from "../lib/apiBase";
 
 type Props = {
   imageUrl: string;
@@ -12,7 +7,7 @@ type Props = {
 };
 
 export default function HomePromoBanner({ imageUrl, linkUrl }: Props) {
-  const src = resolveImageUrl(imageUrl);
+  const src = resolveMediaUrl(imageUrl);
   const img = <img src={src} alt="" className="home-promo-img" />;
   const href = linkUrl?.trim();
   if (href) {

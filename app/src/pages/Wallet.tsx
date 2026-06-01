@@ -52,10 +52,14 @@ function payoutStatusLabel(status: string) {
 export default function Wallet() {
   const { data, loading, error, reload } = usePageLoad(
     () =>
-      Promise.all([userApi.me(), userApi.ledger(), userApi.payouts()]).then(([user, ledger, payouts]) => ({
+      Promise.all([
+        userApi.me(),
+        userApi.ledger(),
+        userApi.payouts({ status: "REQUESTED", limit: 50 }),
+      ]).then(([user, ledger, pendingRes]) => ({
         user,
         ledger,
-        payouts,
+        payouts: pendingRes.items,
       })),
     []
   );

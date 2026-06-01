@@ -18,7 +18,10 @@ export async function requestApi<T>(
       headers: { ...getHeaders(), ...fetchOptions.headers },
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data =
+      res.status === 204
+        ? {}
+        : await res.json().catch(() => ({}));
 
     if (!res.ok) {
       const err = parseApiErrorBody(data, res.status, res.statusText);

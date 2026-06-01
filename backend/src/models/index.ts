@@ -1,7 +1,8 @@
 import mongoose, { Schema, type Types } from "mongoose";
 
 export type PurchaseStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
-export type PayoutStatus = "REQUESTED" | "PAID" | "REJECTED";
+export type PayoutStatus = "REQUESTED" | "PAID" | "REJECTED" | "CREDITED";
+export type PayoutEntryType = "WITHDRAWAL" | "PLAN_PURCHASE";
 export type LedgerType =
   | "PLAN_CREDIT"
   | "PAYOUT_DEBIT"
@@ -133,8 +134,19 @@ const purchaseSchema = new Schema(
 const payoutSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    entryType: { type: String, enum: ["WITHDRAWAL", "PLAN_PURCHASE"], default: "WITHDRAWAL" },
+    purchaseId: { type: Schema.Types.ObjectId, ref: "Purchase", index: true },
     amount: Number,
-    status: { type: String, enum: ["REQUESTED", "PAID", "REJECTED"], default: "REQUESTED" },
+    status: { type: String, enum: ["REQUESTED", "PAID", "REJECTED", "CREDITED"], default: "REQUESTED" },
+    planName: String,
+    planCategory: String,
+    amountPaid: Number,
+    payCurrency: String,
+    creditAmountInr: Number,
+    paidOutAmount: Number,
+    walletBalance: Number,
+    walletHeld: Number,
+    autoApproved: { type: Boolean, default: false },
     transactionRef: String,
     adminNote: String,
     bankSnapshot: String,
@@ -142,6 +154,7 @@ const payoutSchema = new Schema(
   },
   { timestamps: true }
 );
+payoutSchema.index({ entryType: 1, createdAt: -1 });
 
 const ledgerEntrySchema = new Schema(
   {
@@ -205,6 +218,8 @@ const appSettingsSchema = new Schema(
     smsEnabled: { type: Boolean, default: false },
     smsApiKey: { type: String, default: "", select: false },
     usdtToInrRate: { type: Number, default: 83, min: 0.01 },
+    /** Minimum USDT amount for crypto deposits (custom amount & plan price check). */
+    minUsdtDeposit: { type: Number, default: 1, min: 0.01 },
     /** Shown on user home — today's INR bonus % (admin-set) */
     todayInrBonusPercent: { type: Number, default: 0, min: 0, max: 100 },
     /** % of referred user's wallet credit paid to referrer on approved deposit */
@@ -221,6 +236,10 @@ const appSettingsSchema = new Schema(
     newbieRewardsEnabled: { type: Boolean, default: true },
     newbieRewardsTitle: { type: String, default: "Newbie Rewards" },
     newbieRewardsSubtitle: { type: String, default: "" },
+    /** Round-robin counters for payment account rotation (per settlement mode). */
+    paymentRotateManual: { type: Number, default: 0, min: 0 },
+    paymentRotatePaytmAuto: { type: Number, default: 0, min: 0 },
+    paymentRotateCryptoAuto: { type: Number, default: 0, min: 0 },
     newbieRewardsItems: {
       type: [
         new Schema(

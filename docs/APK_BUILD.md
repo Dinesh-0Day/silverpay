@@ -34,9 +34,17 @@ VITE_APK_DOWNLOAD_URL=https://cdn.example.com/silverpay.apk
 
 Rebuild/redeploy the app.
 
-## Without Android SDK
+## Without Android SDK (recommended)
 
-Use [PWABuilder](https://www.pwabuilder.com/):
+From `app/` with live HTTPS URL:
+
+```bash
+APP_URL=https://silverpay.live npm run build:apk:cloud
+```
+
+This calls PWABuilder cloud and writes `app/public/silverpay.apk`. Commit + redeploy the app service.
+
+Or use [PWABuilder](https://www.pwabuilder.com/) manually:
 
 1. Enter your live app URL.
 2. Package for Android → download APK.

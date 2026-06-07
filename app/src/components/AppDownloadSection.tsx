@@ -58,7 +58,7 @@ export default function AppDownloadSection() {
           <p className="profile-download-hint mb-2">
             APK file is not on the server yet. After deploy, run{" "}
             <code className="text-[10px]">npm run build:apk</code> (see docs/APK_BUILD.md) or upload{" "}
-            <code className="text-[10px]">public/silverpay.apk</code>.
+            <code className="text-[10px]">public/silverpay-release.apk</code>.
           </p>
         ) : (
           <a

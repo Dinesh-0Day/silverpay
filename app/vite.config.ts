@@ -16,7 +16,8 @@ export default defineConfig({
         "icons/icon-maskable-512.png",
         "icons/silverpaysplogo.png",
         "manifest.webmanifest",
-        "silverpay.apk",
+        "silverpay-release.apk",
+        "serve.json",
       ],
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,svg,woff2,webmanifest}"],

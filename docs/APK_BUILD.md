@@ -5,7 +5,7 @@
 The user app is a **PWA**. You can:
 
 1. **Install from browser** — Profile → *Install app* (Chrome Android).
-2. **Download APK** — Profile → *Download APK* (`/silverpay.apk`).
+2. **Download APK** — Profile → *Download APK* (`/silverpay-release.apk`).
 
 ## Generate APK (Bubblewrap / TWA)
 
@@ -44,7 +44,7 @@ APP_URL=https://silverpay.live npm run build:apk:cloud
 
 This calls PWABuilder cloud with **signed** APK (`signingMode: new`) and also writes:
 
-- `app/public/silverpay.apk` — installable signed APK
+- `app/public/silverpay-release.apk` — installable signed APK
 - `app/public/.well-known/assetlinks.json` — required for TWA (full-screen app, not browser tab)
 
 Commit both files + redeploy the app service.

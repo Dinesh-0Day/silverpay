@@ -1,11 +1,13 @@
-/** Public APK path (place file at app/public/silverpay.apk or set VITE_APK_DOWNLOAD_URL). */
+/** Signed APK served from public/ (set VITE_APK_DOWNLOAD_URL to override). */
+export const APK_FILENAME = "silverpay-release.apk";
+
 export function getApkDownloadUrl(): string {
   const custom = (import.meta.env.VITE_APK_DOWNLOAD_URL as string | undefined)?.trim();
   if (custom) return custom;
   if (typeof window !== "undefined") {
-    return `${window.location.origin}/silverpay.apk`;
+    return `${window.location.origin}/${APK_FILENAME}`;
   }
-  return "/silverpay.apk";
+  return `/${APK_FILENAME}`;
 }
 
 export function isAndroidDevice() {

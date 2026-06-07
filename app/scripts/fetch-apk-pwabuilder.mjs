@@ -59,7 +59,7 @@ const payload = {
 };
 
 const zipPath = path.join(appRoot, ".pwabuilder-package.zip");
-const outApk = path.join(appRoot, "public", "silverpay.apk");
+const outApk = path.join(appRoot, "public", "silverpay-release.apk");
 const assetLinksDir = path.join(appRoot, "public", ".well-known");
 const assetLinksOut = path.join(assetLinksDir, "assetlinks.json");
 const signingDir = path.join(appRoot, "android-signing");
@@ -141,4 +141,8 @@ if (!signed) {
   process.exit(1);
 }
 
-console.log("\nNext: commit public/silverpay.apk + public/.well-known/assetlinks.json, push, redeploy app.");
+// Remove legacy unsigned file if present
+const legacyApk = path.join(appRoot, "public", "silverpay.apk");
+if (fs.existsSync(legacyApk)) fs.unlinkSync(legacyApk);
+
+console.log("\nNext: commit public/silverpay-release.apk + public/.well-known/assetlinks.json, push, redeploy app.");

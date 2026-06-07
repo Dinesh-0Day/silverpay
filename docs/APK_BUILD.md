@@ -42,7 +42,14 @@ From `app/` with live HTTPS URL:
 APP_URL=https://silverpay.live npm run build:apk:cloud
 ```
 
-This calls PWABuilder cloud and writes `app/public/silverpay.apk`. Commit + redeploy the app service.
+This calls PWABuilder cloud with **signed** APK (`signingMode: new`) and also writes:
+
+- `app/public/silverpay.apk` — installable signed APK
+- `app/public/.well-known/assetlinks.json` — required for TWA (full-screen app, not browser tab)
+
+Commit both files + redeploy the app service.
+
+**Important:** Unsigned APK (`signingMode: none`) will **not install** on most Android phones.
 
 Or use [PWABuilder](https://www.pwabuilder.com/) manually:
 

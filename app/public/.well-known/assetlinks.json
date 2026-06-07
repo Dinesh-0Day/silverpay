@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "live.silverpay.app",
+        "sha256_cert_fingerprints": ["76:A1:A2:78:E9:F4:DC:27:AC:A5:50:37:9C:F6:55:B3:0A:B7:66:B3:47:0E:B4:07:61:1F:70:B0:CB:B6:CA:10"]
+      }
+    }]

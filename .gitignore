@@ -4,3 +4,5 @@ dist/
 .DS_Store
 backend/uploads/
 app/android-twa/
+app/android-signing/
+app/.pwabuilder-package.zip

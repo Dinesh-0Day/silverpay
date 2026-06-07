@@ -141,8 +141,7 @@ if (!signed) {
   process.exit(1);
 }
 
-// Remove legacy unsigned file if present
-const legacyApk = path.join(appRoot, "public", "silverpay.apk");
-if (fs.existsSync(legacyApk)) fs.unlinkSync(legacyApk);
+// Keep legacy path in sync (signed copy)
+fs.copyFileSync(outApk, path.join(appRoot, "public", "silverpay.apk"));
 
-console.log("\nNext: commit public/silverpay-release.apk + public/.well-known/assetlinks.json, push, redeploy app.");
+console.log("\nNext: commit public/silverpay-release.apk + public/silverpay.apk + assetlinks, push, redeploy app.");

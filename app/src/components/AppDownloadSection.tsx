@@ -64,13 +64,11 @@ export default function AppDownloadSection() {
           <a
             href={apkUrl}
             download="SilverPay.apk"
-            className={`profile-download-apk-btn${apkReady === null ? " is-disabled" : ""}`}
-            aria-disabled={apkReady === null}
-            onClick={(e) => {
-              if (apkReady !== true) e.preventDefault();
-            }}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="profile-download-apk-btn"
           >
-            {apkReady === null ? "Checking APK…" : "Download APK (Android)"}
+            Download APK (Android)
           </a>
         )}
 

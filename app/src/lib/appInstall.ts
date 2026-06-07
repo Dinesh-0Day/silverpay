@@ -4,10 +4,9 @@ export const APK_FILENAME = "silverpay-release.apk";
 export function getApkDownloadUrl(): string {
   const custom = (import.meta.env.VITE_APK_DOWNLOAD_URL as string | undefined)?.trim();
   if (custom) return custom;
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/${APK_FILENAME}`;
-  }
-  return `/${APK_FILENAME}`;
+  const base =
+    typeof window !== "undefined" ? `${window.location.origin}/${APK_FILENAME}` : `/${APK_FILENAME}`;
+  return `${base}?v=2`;
 }
 
 export function isAndroidDevice() {

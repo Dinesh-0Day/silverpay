@@ -12,12 +12,18 @@ export function useApkAvailability() {
       return;
     }
     let cancelled = false;
-    fetch(apkUrl, { method: "HEAD" })
+    const bustUrl = `${apkUrl}${apkUrl.includes("?") ? "&" : "?"}cb=1`;
+    fetch(bustUrl, {
+      method: "GET",
+      cache: "no-store",
+      headers: { Range: "bytes=0-0" },
+    })
       .then((r) => {
-        if (!cancelled) setApkReady(r.ok);
+        if (!cancelled) setApkReady(r.ok || r.status === 206);
       })
       .catch(() => {
-        if (!cancelled) setApkReady(false);
+        // Allow download attempt even if availability probe fails (e.g. SW cache).
+        if (!cancelled) setApkReady(true);
       });
     return () => {
       cancelled = true;

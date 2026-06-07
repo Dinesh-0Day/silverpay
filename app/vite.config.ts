@@ -17,10 +17,18 @@ export default defineConfig({
         "icons/silverpaysplogo.png",
         "manifest.webmanifest",
         "silverpay-release.apk",
+        "silverpay.apk",
         "serve.json",
       ],
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,svg,woff2,webmanifest}"],
+        navigateFallbackDenylist: [/\.apk$/i, /^\/silverpay/i],
+        runtimeCaching: [
+          {
+            urlPattern: /\.apk$/i,
+            handler: "NetworkOnly",
+          },
+        ],
       },
     }),
   ],

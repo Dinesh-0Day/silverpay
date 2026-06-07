@@ -14,13 +14,11 @@ export default function TopbarApkDownload() {
     <a
       href={apkUrl}
       download="SilverPay.apk"
-      className={`app-topbar-apk-btn${apkReady !== true ? " is-disabled" : ""}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="app-topbar-apk-btn"
       title={title}
       aria-label="Download APK"
-      aria-disabled={apkReady !== true}
-      onClick={(e) => {
-        if (apkReady !== true) e.preventDefault();
-      }}
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
         <path

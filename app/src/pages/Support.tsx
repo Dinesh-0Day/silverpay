@@ -176,24 +176,6 @@ export default function Support() {
         <span className="support-status-dot" title="Online" />
       </header>
 
-      {resolvedTelegramUrl && (
-        <a
-          href={resolvedTelegramUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="support-telegram-banner"
-        >
-          <span className="support-telegram-banner-icon" aria-hidden>
-            ✈️
-          </span>
-          <span className="support-telegram-banner-text">
-            <strong>Fastest help on Telegram</strong>
-            <span>Chat with {resolvedLabel}</span>
-          </span>
-          <span className="support-telegram-banner-cta">Open</span>
-        </a>
-      )}
-
       <div className="support-quick">
         {QUICK_TOPICS.map((topic) => (
           <button

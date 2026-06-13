@@ -79,11 +79,28 @@ export function minUsdtDepositError(amount: number, min: number) {
   return `Minimum deposit is ${min} USDT (you entered ${amount} USDT)`;
 }
 
+export async function getSupportTelegramUrl(): Promise<string> {
+  const doc = await AppSettings.findOne({ key: SETTINGS_KEY });
+  const { normalizeTelegramUrl } = await import("./supportTelegram.js");
+  return normalizeTelegramUrl(doc?.supportTelegramUrl ?? "");
+}
+
+export async function setSupportTelegramUrl(raw: string) {
+  const { normalizeTelegramUrl } = await import("./supportTelegram.js");
+  const value = normalizeTelegramUrl(raw);
+  return AppSettings.findOneAndUpdate(
+    { key: SETTINGS_KEY },
+    { supportTelegramUrl: value },
+    { upsert: true, new: true }
+  );
+}
+
 export async function getPlatformSettings() {
   const rate = await getUsdtToInrRate();
   const todayInrBonusPercent = await getTodayInrBonusPercent();
   const referralCommissionPercent = await getReferralCommissionPercent();
   const minUsdtDeposit = await getMinUsdtDeposit();
+  const supportTelegramUrl = await getSupportTelegramUrl();
   const { getHomeBanner } = await import("./homeBanner.js");
   const homeBanner = await getHomeBanner();
   return {
@@ -91,6 +108,7 @@ export async function getPlatformSettings() {
     todayInrBonusPercent,
     referralCommissionPercent,
     minUsdtDeposit,
+    supportTelegramUrl,
     homeBanner,
   };
 }

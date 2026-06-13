@@ -19,8 +19,19 @@ function timeLabel(iso?: string) {
   return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
 
+function cleanMessageBody(body: string) {
+  return body.replace(/^\[support-telegram-auto\]\n?/, "");
+}
+
+function extractTelegramUrl(text: string): string | null {
+  const m = text.match(/https?:\/\/t\.me\/[^\s]+/i);
+  return m?.[0] ?? null;
+}
+
 export default function Support() {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
+  const [telegramUrl, setTelegramUrl] = useState("");
+  const [telegramLabel, setTelegramLabel] = useState("Telegram");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
@@ -34,6 +45,8 @@ export default function Support() {
       .supportMessages()
       .then((r) => {
         setMessages(r.messages ?? []);
+        setTelegramUrl(r.telegramUrl?.trim() ?? "");
+        setTelegramLabel(r.telegramLabel?.trim() || "Telegram");
         setLoadError("");
       })
       .catch((e) => setLoadError(getErrorMessage(e)))
@@ -86,6 +99,24 @@ export default function Support() {
         <span className="support-status-dot" title="Online" />
       </header>
 
+      {telegramUrl && (
+        <a
+          href={telegramUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="support-telegram-banner"
+        >
+          <span className="support-telegram-banner-icon" aria-hidden>
+            ✈️
+          </span>
+          <span className="support-telegram-banner-text">
+            <strong>Fastest help on Telegram</strong>
+            <span>Chat with {telegramLabel} — tap to open</span>
+          </span>
+          <span className="support-telegram-banner-cta">Open</span>
+        </a>
+      )}
+
       <div className="support-quick">
         {QUICK_TOPICS.map((topic) => (
           <button
@@ -108,14 +139,35 @@ export default function Support() {
             <div className="support-welcome">
               <p className="support-welcome-title">How can we help?</p>
               <p>Pick a topic above or type your message below.</p>
+              {telegramUrl && (
+                <p className="support-welcome-telegram">
+                  After you send a message, we&apos;ll share our Telegram contact for instant chat.
+                </p>
+              )}
             </div>
           )}
           {messages.map((m) => {
             const isUser = m.sender === "USER";
+            const isSystem = m.sender === "SYSTEM";
+            const displayBody = cleanMessageBody(m.body);
+            const msgTelegramUrl = isSystem ? extractTelegramUrl(displayBody) ?? telegramUrl : null;
             return (
-              <div key={m.id} className={`support-bubble-row${isUser ? " is-user" : " is-staff"}`}>
-                <div className={`support-bubble${isUser ? " is-user" : " is-staff"}`}>
-                  <p>{m.body}</p>
+              <div
+                key={m.id}
+                className={`support-bubble-row${isUser ? " is-user" : " is-staff"}${isSystem ? " is-system" : ""}`}
+              >
+                <div className={`support-bubble${isUser ? " is-user" : " is-staff"}${isSystem ? " is-system" : ""}`}>
+                  <p className="support-bubble-text">{displayBody}</p>
+                  {msgTelegramUrl && (
+                    <a
+                      href={msgTelegramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="support-telegram-btn"
+                    >
+                      Open Telegram ({telegramLabel})
+                    </a>
+                  )}
                   {m.createdAt && <time className="support-bubble-time">{timeLabel(m.createdAt)}</time>}
                 </div>
               </div>

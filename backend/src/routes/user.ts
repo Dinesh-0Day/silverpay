@@ -848,9 +848,16 @@ userRouter.get("/payouts", async (req: AuthRequest, res) => {
 });
 
 userRouter.get("/support/messages", async (req: AuthRequest, res) => {
+  const { getSupportTelegramUrl } = await import("../lib/appSettings.js");
+  const { telegramDisplayLabel } = await import("../lib/supportTelegram.js");
+  const telegramUrl = await getSupportTelegramUrl();
   const conv = await SupportConversation.findOne({ userId: req.user!.sub });
   if (!conv) {
-    res.json({ messages: [] });
+    res.json({
+      messages: [],
+      telegramUrl: telegramUrl || undefined,
+      telegramLabel: telegramUrl ? telegramDisplayLabel(telegramUrl) : undefined,
+    });
     return;
   }
   const messages = conv.messages.map((m) => ({
@@ -859,10 +866,19 @@ userRouter.get("/support/messages", async (req: AuthRequest, res) => {
     body: m.body,
     createdAt: m.createdAt,
   }));
-  res.json({ messages });
+  res.json({
+    messages,
+    telegramUrl: telegramUrl || undefined,
+    telegramLabel: telegramUrl ? telegramDisplayLabel(telegramUrl) : undefined,
+  });
 });
 
 userRouter.post("/support/messages", async (req: AuthRequest, res) => {
+  const { getSupportTelegramUrl } = await import("../lib/appSettings.js");
+  const {
+    buildSupportTelegramAutoReply,
+    SUPPORT_TELEGRAM_AUTO_MARKER,
+  } = await import("../lib/supportTelegram.js");
   const schema = z.object({ body: z.string().min(1).max(2000) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
@@ -876,13 +892,21 @@ userRouter.post("/support/messages", async (req: AuthRequest, res) => {
   }
   conv.messages.push({ sender: "USER", body: parsed.data.body });
   conv.status = "OPEN";
+
+  const telegramUrl = await getSupportTelegramUrl();
+  if (telegramUrl) {
+    const autoBody = `${SUPPORT_TELEGRAM_AUTO_MARKER}\n${buildSupportTelegramAutoReply(telegramUrl)}`;
+    conv.messages.push({ sender: "SYSTEM", body: autoBody });
+  }
+
   await conv.save();
-  const msg = conv.messages[conv.messages.length - 1];
+  const msg = conv.messages[conv.messages.length - (telegramUrl ? 2 : 1)];
   res.status(201).json({
     id: msg._id?.toString(),
     sender: msg.sender,
     body: msg.body,
     createdAt: msg.createdAt,
+    telegramUrl: telegramUrl || undefined,
   });
 });
 

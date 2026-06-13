@@ -40,6 +40,7 @@ export const adminApi = {
       minUsdtDeposit: number;
       todayInrBonusPercent: number;
       referralCommissionPercent: number;
+      supportTelegramUrl: string;
     }>("/admin/platform-settings"),
   smsSettings: () =>
     api<{ enabled: boolean; configured: boolean; apiKeyMasked: string; provider: string }>("/admin/sms-settings"),
@@ -58,6 +59,7 @@ export const adminApi = {
     minUsdtDeposit?: number;
     todayInrBonusPercent?: number;
     referralCommissionPercent?: number;
+    supportTelegramUrl?: string;
     currentPassword: string;
   }) =>
     api<{
@@ -65,6 +67,7 @@ export const adminApi = {
       minUsdtDeposit: number;
       todayInrBonusPercent: number;
       referralCommissionPercent: number;
+      supportTelegramUrl: string;
     }>(
       "/admin/platform-settings",
       {

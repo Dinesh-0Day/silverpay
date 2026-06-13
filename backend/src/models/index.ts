@@ -173,7 +173,7 @@ const ledgerEntrySchema = new Schema(
 
 const supportMessageSchema = new Schema(
   {
-    sender: { type: String, enum: ["USER", "ADMIN"], required: true },
+    sender: { type: String, enum: ["USER", "ADMIN", "SYSTEM"], required: true },
     adminId: { type: Schema.Types.ObjectId, ref: "Admin" },
     body: { type: String, required: true },
   },
@@ -240,6 +240,8 @@ const appSettingsSchema = new Schema(
     paymentRotateManual: { type: Number, default: 0, min: 0 },
     paymentRotatePaytmAuto: { type: Number, default: 0, min: 0 },
     paymentRotateCryptoAuto: { type: Number, default: 0, min: 0 },
+    /** User support → auto-reply with this Telegram link (t.me or @username). */
+    supportTelegramUrl: { type: String, default: "" },
     newbieRewardsItems: {
       type: [
         new Schema(

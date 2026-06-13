@@ -139,9 +139,13 @@ export const userApi = {
   createPayout: (amount: number) => api<Payout>("/user/payouts", { method: "POST", body: JSON.stringify({ amount }) }),
   payouts: (opts?: { page?: number; limit?: number; status?: string }) =>
     api<Paginated<Payout>>(`/user/payouts${listQuery(opts)}`),
-  supportMessages: () => api<{ messages: SupportMessage[] }>("/user/support/messages"),
+  supportMessages: () =>
+    api<{ messages: SupportMessage[]; telegramUrl?: string; telegramLabel?: string }>("/user/support/messages"),
   sendSupportMessage: (body: string) =>
-    api<SupportMessage>("/user/support/messages", { method: "POST", body: JSON.stringify({ body }) }),
+    api<SupportMessage & { telegramUrl?: string }>("/user/support/messages", {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    }),
 };
 
 export type HomeBannerSlide = {

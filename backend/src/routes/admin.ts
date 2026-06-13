@@ -22,6 +22,7 @@ import {
   getPlatformSettings,
   setMinUsdtDeposit,
   setReferralCommissionPercent,
+  setSupportTelegramUrl,
   setUsdtToInrRate,
 } from "../lib/appSettings.js";
 import { getSmsSettingsPublic, updateSmsSettings } from "../lib/smsSettings.js";
@@ -299,6 +300,7 @@ adminRouter.patch("/platform-settings", async (req: AuthRequest, res) => {
       minUsdtDeposit: z.number().positive().max(1_000_000).optional(),
       todayInrBonusPercent: z.number().min(0).max(100).optional(),
       referralCommissionPercent: z.number().min(0).max(100).optional(),
+      supportTelegramUrl: z.string().max(500).optional(),
       currentPassword: z.string().min(1),
     })
     .refine(
@@ -306,7 +308,8 @@ adminRouter.patch("/platform-settings", async (req: AuthRequest, res) => {
         d.usdtToInrRate !== undefined ||
         d.minUsdtDeposit !== undefined ||
         d.todayInrBonusPercent !== undefined ||
-        d.referralCommissionPercent !== undefined,
+        d.referralCommissionPercent !== undefined ||
+        d.supportTelegramUrl !== undefined,
       { message: "Provide at least one setting to update" }
     );
   const parsed = schema.safeParse(req.body);
@@ -336,6 +339,9 @@ adminRouter.patch("/platform-settings", async (req: AuthRequest, res) => {
   }
   if (parsed.data.referralCommissionPercent !== undefined) {
     await setReferralCommissionPercent(parsed.data.referralCommissionPercent);
+  }
+  if (parsed.data.supportTelegramUrl !== undefined) {
+    await setSupportTelegramUrl(parsed.data.supportTelegramUrl);
   }
   res.json(await getPlatformSettings());
 });

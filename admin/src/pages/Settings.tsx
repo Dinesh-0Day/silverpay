@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader, Card, Button, Input, Label, LoadingBlock, Alert, SectionTitle } from "../components/ui";
 import { adminApi, getErrorMessage, type HomeBannerSlide } from "../api";
-import { UserCog, KeyRound, Coins, Megaphone, Smartphone, BellRing, Gift } from "lucide-react";
+import { UserCog, KeyRound, Coins, Megaphone, Smartphone, BellRing, Gift, MessageCircle } from "lucide-react";
 import { REWARD_TASK_OPTIONS, type NewbieRewardItem, type NewbieRewardTaskType } from "../api";
 
 export default function Settings() {
@@ -16,6 +16,8 @@ export default function Settings() {
   const [minUsdtDeposit, setMinUsdtDeposit] = useState("");
   const [todayInrBonusPercent, setTodayInrBonusPercent] = useState("");
   const [referralCommissionPercent, setReferralCommissionPercent] = useState("");
+  const [supportTelegramUrl, setSupportTelegramUrl] = useState("");
+  const [supportTelegramPassword, setSupportTelegramPassword] = useState("");
   const [ratePassword, setRatePassword] = useState("");
   const [rewardsEnabled, setRewardsEnabled] = useState(true);
   const [rewardsTitle, setRewardsTitle] = useState("");
@@ -59,6 +61,7 @@ export default function Settings() {
         setMinUsdtDeposit(String(settings.minUsdtDeposit ?? 1));
         setTodayInrBonusPercent(String(settings.todayInrBonusPercent ?? 0));
         setReferralCommissionPercent(String(settings.referralCommissionPercent ?? 5));
+        setSupportTelegramUrl(settings.supportTelegramUrl ?? "");
         setRewardsEnabled(rewards.enabled);
         setRewardsTitle(rewards.title);
         setRewardsSubtitle(rewards.subtitle);
@@ -140,6 +143,23 @@ export default function Settings() {
       setMsg("Home rates & team commission % saved.");
     } catch (e) {
       setErr(getErrorMessage(e));
+    }
+  };
+
+  const saveSupportTelegram = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr("");
+    setMsg("");
+    try {
+      const updated = await adminApi.updatePlatformSettings({
+        supportTelegramUrl: supportTelegramUrl.trim(),
+        currentPassword: supportTelegramPassword,
+      });
+      setSupportTelegramUrl(updated.supportTelegramUrl ?? "");
+      setSupportTelegramPassword("");
+      setMsg("Support Telegram link saved. Users will get it automatically in chat.");
+    } catch (err) {
+      setErr(getErrorMessage(err));
     }
   };
 
@@ -554,6 +574,40 @@ export default function Settings() {
             <Input type="password" value={ratePassword} onChange={(e) => setRatePassword(e.target.value)} required />
           </div>
           <Button type="submit">Save home settings</Button>
+        </form>
+      </Card>
+
+      <Card className="mb-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center">
+            <MessageCircle size={20} />
+          </div>
+          <SectionTitle>Support Telegram</SectionTitle>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">
+          When a user sends a message in Live Support, they automatically receive this Telegram link to chat with your
+          team. Use a channel, group, or bot link — e.g. <code className="text-xs">@silverpay_support</code> or{" "}
+          <code className="text-xs">https://t.me/silverpay_support</code>.
+        </p>
+        <form onSubmit={saveSupportTelegram} className="space-y-4">
+          <div>
+            <Label>Telegram contact URL or @username</Label>
+            <Input
+              value={supportTelegramUrl}
+              onChange={(e) => setSupportTelegramUrl(e.target.value)}
+              placeholder="@your_support or https://t.me/your_support"
+            />
+          </div>
+          <div>
+            <Label>Current password (required to save)</Label>
+            <Input
+              type="password"
+              value={supportTelegramPassword}
+              onChange={(e) => setSupportTelegramPassword(e.target.value)}
+              required
+            />
+          </div>
+          <Button type="submit">Save Telegram support</Button>
         </form>
       </Card>
 

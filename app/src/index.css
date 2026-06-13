@@ -2427,6 +2427,30 @@ body {
   background: #22c55e;
   box-shadow: 0 0 0 3px rgb(34 197 94 / 0.25);
 }
+.support-telegram-banner {
+  @apply flex items-center gap-3 p-3 mb-3 rounded-2xl no-underline;
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  border: 1px solid rgb(125 211 252 / 0.4);
+  box-shadow: 0 8px 20px rgb(14 165 233 / 0.22);
+  color: #fff;
+}
+.support-telegram-banner-icon {
+  @apply text-xl shrink-0;
+}
+.support-telegram-banner-text {
+  @apply flex flex-col flex-1 min-w-0;
+}
+.support-telegram-banner-text strong {
+  @apply text-sm font-bold leading-tight;
+}
+.support-telegram-banner-text span {
+  @apply text-[11px] opacity-90 mt-0.5;
+}
+.support-telegram-banner-cta {
+  @apply text-xs font-bold px-3 py-1.5 rounded-lg shrink-0;
+  background: rgb(255 255 255 / 0.2);
+  border: 1px solid rgb(255 255 255 / 0.35);
+}
 .support-quick {
   @apply flex flex-wrap gap-2 mb-3;
 }
@@ -2452,6 +2476,9 @@ body {
 .support-welcome p:last-child {
   @apply text-xs text-slate-500 m-0;
 }
+.support-welcome-telegram {
+  @apply text-xs text-sky-700 mt-2 m-0;
+}
 .support-bubble-row {
   @apply flex;
 }
@@ -2474,8 +2501,19 @@ body {
   border: 1px solid rgb(226 232 240);
   border-bottom-left-radius: 0.35rem;
 }
-.support-bubble p {
-  @apply m-0 leading-relaxed whitespace-pre-wrap;
+.support-bubble.is-system {
+  background: linear-gradient(135deg, rgb(224 242 254) 0%, rgb(186 230 253) 100%);
+  border: 1px solid rgb(125 211 252 / 0.6);
+}
+.support-bubble p,
+.support-bubble-text {
+  @apply m-0 leading-relaxed whitespace-pre-wrap break-words;
+}
+.support-telegram-btn {
+  @apply inline-flex items-center justify-center mt-2.5 px-3 py-2 rounded-xl text-xs font-bold no-underline;
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: #fff;
+  box-shadow: 0 4px 12px rgb(14 165 233 / 0.3);
 }
 .support-bubble-time {
   @apply block text-[10px] mt-1 opacity-70;

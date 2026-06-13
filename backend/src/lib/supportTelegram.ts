@@ -50,7 +50,7 @@ export function parseEmbeddedTelegramUrl(body: string): string | null {
 export function stripTelegramEmbed(body: string): string {
   let text = body
     .replace(/\[\[TG:[^\]]+\]\]\n?/, "")
-    .replace(/^__TG__https?:\/\/[^\s\n]+__?\n?/, "")
+    .replace(/^__TG__https?:\/\/[^\s\n]+(?:__)?\n?/, "")
     .replace(/^\[support-telegram-auto\]\s*/i, "")
     .replace(/https?:\/\/t\.me\/[^\s\n]+/gi, "")
     .replace(/For faster support, chat with us on Telegram\s*\([^)]*\):?/gi, "")

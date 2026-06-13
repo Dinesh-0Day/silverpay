@@ -55,7 +55,12 @@ export const userApi = {
   cryptoCalculator: (amount: number) =>
     api<CryptoCalcResult>(`/user/crypto-calculator?amount=${amount}`),
   cryptoSettings: () =>
-    api<{ usdtToInrRate: number; minUsdtDeposit: number; todayInrBonusPercent?: number }>("/user/crypto-settings"),
+    api<{
+      usdtToInrRate: number;
+      minUsdtDeposit: number;
+      todayInrBonusPercent?: number;
+      supportTelegramUrl?: string;
+    }>("/user/crypto-settings"),
   homeInfo: () =>
     api<{
       usdtToInrRate: number;

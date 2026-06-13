@@ -43,7 +43,7 @@ function extractUrlFromBody(body: string): string | null {
 function formatAutoReplyText(body: string): string {
   let text = body
     .replace(/\[\[TG:[^\]]+\]\]\n?/, "")
-    .replace(/^__TG__https?:\/\/[^\s\n]+__?\n?/, "")
+    .replace(/^__TG__https?:\/\/[^\s\n]+(?:__)?\n?/, "")
     .replace(/^\[support-telegram-auto\]\s*/i, "")
     .replace(/https?:\/\/t\.me\/[^\s\n]+/gi, "")
     .replace(/For faster support, chat with us on Telegram\s*\([^)]*\):?/gi, "")
@@ -95,14 +95,20 @@ export default function Support() {
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const applyTelegramUrl = (url: string, label?: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    setTelegramUrl(trimmed);
+    setTelegramLabel(label?.trim() || telegramLabelFromUrl(trimmed));
+  };
+
   const load = () =>
-    userApi
-      .supportMessages()
-      .then((r) => {
-        setMessages(r.messages ?? []);
-        const apiUrl = r.telegramUrl?.trim() ?? "";
-        setTelegramUrl(apiUrl);
-        setTelegramLabel(r.telegramLabel?.trim() || (apiUrl ? telegramLabelFromUrl(apiUrl) : "Telegram Support"));
+    Promise.all([userApi.supportMessages(), userApi.cryptoSettings().catch(() => null)])
+      .then(([support, settings]) => {
+        setMessages(support.messages ?? []);
+        const supportUrl = support.telegramUrl?.trim() ?? "";
+        const settingsUrl = settings?.supportTelegramUrl?.trim() ?? "";
+        applyTelegramUrl(supportUrl || settingsUrl, support.telegramLabel);
         setLoadError("");
       })
       .catch((e) => setLoadError(getErrorMessage(e)))
@@ -240,16 +246,16 @@ export default function Support() {
         </div>
       </PageStatus>
 
-      {resolvedTelegramUrl && hasUserMessage && (
+      {resolvedTelegramUrl ? (
         <a
           href={resolvedTelegramUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="support-telegram-compose-cta"
         >
-          ✈️ Continue on Telegram — {resolvedLabel}
+          ✈️ {hasUserMessage ? "Continue on Telegram" : "Chat on Telegram"} — {resolvedLabel}
         </a>
-      )}
+      ) : null}
 
       <ErrorAlert message={error} />
       <form onSubmit={onSubmit} className="support-compose">

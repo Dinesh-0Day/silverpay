@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { userApi, getErrorMessage, type SupportMessage } from "../api";
 import ErrorAlert from "../components/ErrorAlert";
 import PageStatus from "../components/PageStatus";
@@ -19,9 +19,23 @@ function timeLabel(iso?: string) {
   return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
 
-/** Strip legacy auto-reply noise (marker, raw URLs, bad @ labels). */
-function formatSystemMessage(body: string, telegramUrl: string): string {
+function telegramLabelFromUrl(url: string): string {
+  const m = url.match(/t\.me\/([^/?#]+)/i);
+  if (!m?.[1]) return "Telegram Support";
+  const slug = decodeURIComponent(m[1]);
+  if (slug.startsWith("+") || slug.startsWith("joinchat")) return "Telegram Support";
+  return `@${slug}`;
+}
+
+function extractUrlFromBody(body: string): string | null {
+  const embedded = body.match(/^__TG__(.+?)__/);
+  if (embedded?.[1]) return embedded[1].trim();
+  return body.match(/https?:\/\/t\.me\/[^\s]+/i)?.[0] ?? null;
+}
+
+function formatAutoReplyText(body: string): string {
   let text = body
+    .replace(/^__TG__.+?__\n?/, "")
     .replace(/^\[support-telegram-auto\]\s*/i, "")
     .replace(/https?:\/\/t\.me\/[^\s]+/gi, "")
     .replace(/For faster support, chat with us on Telegram\s*\([^)]*\):?/gi, "")
@@ -30,14 +44,34 @@ function formatSystemMessage(body: string, telegramUrl: string): string {
     .trim();
 
   if (!text) {
-    text = "Thanks for your message!\n\nFor faster support, continue on Telegram.\nTap the button below to open our support chat.";
+    text =
+      "Thanks for your message!\n\nFor faster support, continue on Telegram.\nTap the button below to open our support chat.";
   }
   return text;
 }
 
 function isTelegramAutoMessage(m: SupportMessage) {
   if (m.sender === "SYSTEM") return true;
-  return /\[support-telegram-auto\]/i.test(m.body) || /https?:\/\/t\.me\//i.test(m.body);
+  return (
+    /^__TG__.+?__/m.test(m.body) ||
+    /\[support-telegram-auto\]/i.test(m.body) ||
+    /https?:\/\/t\.me\//i.test(m.body) ||
+    /continue on Telegram/i.test(m.body)
+  );
+}
+
+function TelegramChatButton({ url, label }: { url: string; label: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="support-telegram-btn"
+      onClick={(e) => e.stopPropagation()}
+    >
+      ✈️ Chat on {label}
+    </a>
+  );
 }
 
 export default function Support() {
@@ -57,8 +91,9 @@ export default function Support() {
       .supportMessages()
       .then((r) => {
         setMessages(r.messages ?? []);
-        setTelegramUrl(r.telegramUrl?.trim() ?? "");
-        setTelegramLabel(r.telegramLabel?.trim() || "Telegram Support");
+        const apiUrl = r.telegramUrl?.trim() ?? "";
+        setTelegramUrl(apiUrl);
+        setTelegramLabel(r.telegramLabel?.trim() || (apiUrl ? telegramLabelFromUrl(apiUrl) : "Telegram Support"));
         setLoadError("");
       })
       .catch((e) => setLoadError(getErrorMessage(e)))
@@ -75,6 +110,22 @@ export default function Support() {
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [messages.length, sending]);
+
+  const resolvedTelegramUrl = useMemo(() => {
+    if (telegramUrl) return telegramUrl;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const url = extractUrlFromBody(messages[i].body);
+      if (url) return url;
+    }
+    return "";
+  }, [telegramUrl, messages]);
+
+  const resolvedLabel = useMemo(
+    () => (resolvedTelegramUrl ? telegramLabelFromUrl(resolvedTelegramUrl) : telegramLabel),
+    [resolvedTelegramUrl, telegramLabel]
+  );
+
+  const hasUserMessage = messages.some((m) => m.sender === "USER");
 
   const send = async (text?: string) => {
     const msg = (text ?? body).trim();
@@ -111,9 +162,9 @@ export default function Support() {
         <span className="support-status-dot" title="Online" />
       </header>
 
-      {telegramUrl && (
+      {resolvedTelegramUrl && (
         <a
-          href={telegramUrl}
+          href={resolvedTelegramUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="support-telegram-banner"
@@ -123,7 +174,7 @@ export default function Support() {
           </span>
           <span className="support-telegram-banner-text">
             <strong>Fastest help on Telegram</strong>
-            <span>Chat with {telegramLabel}</span>
+            <span>Chat with {resolvedLabel}</span>
           </span>
           <span className="support-telegram-banner-cta">Open</span>
         </a>
@@ -151,19 +202,15 @@ export default function Support() {
             <div className="support-welcome">
               <p className="support-welcome-title">How can we help?</p>
               <p>Pick a topic above or type your message below.</p>
-              {telegramUrl && (
-                <p className="support-welcome-telegram">
-                  After you send a message, we&apos;ll share our Telegram contact for instant chat.
-                </p>
-              )}
             </div>
           )}
           {messages.map((m) => {
             const isUser = m.sender === "USER";
             const isTelegramAuto = isTelegramAutoMessage(m);
-            const displayBody = isTelegramAuto
-              ? formatSystemMessage(m.body, telegramUrl)
-              : m.body;
+            const msgUrl = extractUrlFromBody(m.body) || resolvedTelegramUrl;
+            const displayBody = isTelegramAuto ? formatAutoReplyText(m.body) : m.body;
+            const msgLabel = msgUrl ? telegramLabelFromUrl(msgUrl) : resolvedLabel;
+
             return (
               <div
                 key={m.id}
@@ -173,16 +220,7 @@ export default function Support() {
                   className={`support-bubble${isUser ? " is-user" : " is-staff"}${isTelegramAuto ? " is-system" : ""}`}
                 >
                   <p className="support-bubble-text">{displayBody}</p>
-                  {isTelegramAuto && telegramUrl && (
-                    <a
-                      href={telegramUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="support-telegram-btn"
-                    >
-                      ✈️ Chat on {telegramLabel}
-                    </a>
-                  )}
+                  {isTelegramAuto && msgUrl && <TelegramChatButton url={msgUrl} label={msgLabel} />}
                   {m.createdAt && <time className="support-bubble-time">{timeLabel(m.createdAt)}</time>}
                 </div>
               </div>
@@ -190,6 +228,17 @@ export default function Support() {
           })}
         </div>
       </PageStatus>
+
+      {resolvedTelegramUrl && hasUserMessage && (
+        <a
+          href={resolvedTelegramUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="support-telegram-compose-cta"
+        >
+          ✈️ Continue on Telegram — {resolvedLabel}
+        </a>
+      )}
 
       <ErrorAlert message={error} />
       <form onSubmit={onSubmit} className="support-compose">

@@ -17,11 +17,23 @@ export function telegramDisplayLabel(url: string): string {
   return `@${slug}`;
 }
 
-export function buildSupportTelegramAutoReply(): string {
+const TG_EMBED_PREFIX = "__TG__";
+
+export function buildSupportTelegramAutoReplyText(): string {
   return [
     "Thanks for your message!",
     "",
     "For faster support, continue on Telegram.",
     "Tap the button below to open our support chat.",
   ].join("\n");
+}
+
+/** Embed Telegram URL in message so the app can always render a clickable button. */
+export function buildSupportTelegramAutoReply(url: string): string {
+  return `${TG_EMBED_PREFIX}${url}__\n${buildSupportTelegramAutoReplyText()}`;
+}
+
+export function parseEmbeddedTelegramUrl(body: string): string | null {
+  const m = body.match(new RegExp(`^${TG_EMBED_PREFIX}(.+?)__`));
+  return m?.[1]?.trim() || null;
 }

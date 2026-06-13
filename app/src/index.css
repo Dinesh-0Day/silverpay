@@ -2519,6 +2519,12 @@ body {
 .support-telegram-btn:active {
   opacity: 0.92;
 }
+.support-telegram-compose-cta {
+  @apply flex w-full items-center justify-center gap-1.5 mb-2 py-3 rounded-2xl text-sm font-bold no-underline;
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: #fff;
+  box-shadow: 0 6px 16px rgb(14 165 233 / 0.35);
+}
 .support-bubble-time {
   @apply block text-[10px] mt-1 opacity-70;
 }

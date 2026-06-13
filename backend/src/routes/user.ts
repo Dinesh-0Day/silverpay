@@ -894,7 +894,7 @@ userRouter.post("/support/messages", async (req: AuthRequest, res) => {
 
   const telegramUrl = await getSupportTelegramUrl();
   if (telegramUrl) {
-    conv.messages.push({ sender: "SYSTEM", body: buildSupportTelegramAutoReply() });
+    conv.messages.push({ sender: "SYSTEM", body: buildSupportTelegramAutoReply(telegramUrl) });
   }
 
   await conv.save();

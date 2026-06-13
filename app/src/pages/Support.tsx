@@ -28,16 +28,24 @@ function telegramLabelFromUrl(url: string): string {
 }
 
 function extractUrlFromBody(body: string): string | null {
-  const embedded = body.match(/^__TG__(.+?)__/);
-  if (embedded?.[1]) return embedded[1].trim();
-  return body.match(/https?:\/\/t\.me\/[^\s]+/i)?.[0] ?? null;
+  const tagged = body.match(/\[\[TG:([^\]]+)\]\]/);
+  if (tagged?.[1]) return tagged[1].trim();
+
+  const legacyClosed = body.match(/^__TG__(https?:\/\/[^\s\n]+)__/);
+  if (legacyClosed?.[1]) return legacyClosed[1].trim();
+
+  const legacyOpen = body.match(/^__TG__(https?:\/\/[^\s\n]+)/);
+  if (legacyOpen?.[1]) return legacyOpen[1].trim();
+
+  return body.match(/https?:\/\/t\.me\/[^\s\n]+/i)?.[0]?.trim() ?? null;
 }
 
 function formatAutoReplyText(body: string): string {
   let text = body
-    .replace(/^__TG__.+?__\n?/, "")
+    .replace(/\[\[TG:[^\]]+\]\]\n?/, "")
+    .replace(/^__TG__https?:\/\/[^\s\n]+__?\n?/, "")
     .replace(/^\[support-telegram-auto\]\s*/i, "")
-    .replace(/https?:\/\/t\.me\/[^\s]+/gi, "")
+    .replace(/https?:\/\/t\.me\/[^\s\n]+/gi, "")
     .replace(/For faster support, chat with us on Telegram\s*\([^)]*\):?/gi, "")
     .replace(/Tap the link above[^\n]*/gi, "")
     .replace(/\n{3,}/g, "\n\n")
@@ -53,7 +61,8 @@ function formatAutoReplyText(body: string): string {
 function isTelegramAutoMessage(m: SupportMessage) {
   if (m.sender === "SYSTEM") return true;
   return (
-    /^__TG__.+?__/m.test(m.body) ||
+    /\[\[TG:[^\]]+\]\]/.test(m.body) ||
+    /^__TG__https?:\/\//m.test(m.body) ||
     /\[support-telegram-auto\]/i.test(m.body) ||
     /https?:\/\/t\.me\//i.test(m.body) ||
     /continue on Telegram/i.test(m.body)
@@ -114,8 +123,9 @@ export default function Support() {
   const resolvedTelegramUrl = useMemo(() => {
     if (telegramUrl) return telegramUrl;
     for (let i = messages.length - 1; i >= 0; i--) {
-      const url = extractUrlFromBody(messages[i].body);
-      if (url) return url;
+      const m = messages[i];
+      const fromMsg = m.telegramUrl?.trim() || extractUrlFromBody(m.body);
+      if (fromMsg) return fromMsg;
     }
     return "";
   }, [telegramUrl, messages]);
@@ -207,7 +217,8 @@ export default function Support() {
           {messages.map((m) => {
             const isUser = m.sender === "USER";
             const isTelegramAuto = isTelegramAutoMessage(m);
-            const msgUrl = extractUrlFromBody(m.body) || resolvedTelegramUrl;
+            const msgUrl =
+              m.telegramUrl?.trim() || extractUrlFromBody(m.body) || resolvedTelegramUrl;
             const displayBody = isTelegramAuto ? formatAutoReplyText(m.body) : m.body;
             const msgLabel = msgUrl ? telegramLabelFromUrl(msgUrl) : resolvedLabel;
 
@@ -220,7 +231,7 @@ export default function Support() {
                   className={`support-bubble${isUser ? " is-user" : " is-staff"}${isTelegramAuto ? " is-system" : ""}`}
                 >
                   <p className="support-bubble-text">{displayBody}</p>
-                  {isTelegramAuto && msgUrl && <TelegramChatButton url={msgUrl} label={msgLabel} />}
+                  {isTelegramAuto && msgUrl ? <TelegramChatButton url={msgUrl} label={msgLabel} /> : null}
                   {m.createdAt && <time className="support-bubble-time">{timeLabel(m.createdAt)}</time>}
                 </div>
               </div>

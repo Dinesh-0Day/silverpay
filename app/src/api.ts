@@ -286,6 +286,7 @@ export type SupportMessage = {
   sender: string;
   body: string;
   createdAt: string;
+  telegramUrl?: string;
 };
 
 export type UserNotification = {

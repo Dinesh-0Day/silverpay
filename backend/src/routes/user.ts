@@ -849,7 +849,11 @@ userRouter.get("/payouts", async (req: AuthRequest, res) => {
 
 userRouter.get("/support/messages", async (req: AuthRequest, res) => {
   const { getSupportTelegramUrl } = await import("../lib/appSettings.js");
-  const { telegramDisplayLabel } = await import("../lib/supportTelegram.js");
+  const {
+    telegramDisplayLabel,
+    parseEmbeddedTelegramUrl,
+    stripTelegramEmbed,
+  } = await import("../lib/supportTelegram.js");
   const telegramUrl = await getSupportTelegramUrl();
   const conv = await SupportConversation.findOne({ userId: req.user!.sub });
   if (!conv) {
@@ -860,12 +864,18 @@ userRouter.get("/support/messages", async (req: AuthRequest, res) => {
     });
     return;
   }
-  const messages = conv.messages.map((m) => ({
-    id: m._id?.toString(),
-    sender: m.sender,
-    body: m.body,
-    createdAt: m.createdAt,
-  }));
+  const messages = conv.messages.map((m) => {
+    const isSystem = m.sender === "SYSTEM";
+    const embeddedUrl = isSystem ? parseEmbeddedTelegramUrl(m.body) : null;
+    const actionUrl = embeddedUrl || telegramUrl || "";
+    return {
+      id: m._id?.toString(),
+      sender: m.sender,
+      body: isSystem ? stripTelegramEmbed(m.body) : m.body,
+      createdAt: m.createdAt,
+      ...(isSystem && actionUrl ? { telegramUrl: actionUrl } : {}),
+    };
+  });
   res.json({
     messages,
     telegramUrl: telegramUrl || undefined,

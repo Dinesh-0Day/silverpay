@@ -2510,10 +2510,14 @@ body {
   @apply m-0 leading-relaxed whitespace-pre-wrap break-words;
 }
 .support-telegram-btn {
-  @apply inline-flex items-center justify-center mt-2.5 px-3 py-2 rounded-xl text-xs font-bold no-underline;
+  @apply flex w-full items-center justify-center gap-1.5 mt-2.5 px-3 py-2.5 rounded-xl text-sm font-bold no-underline;
   background: linear-gradient(135deg, #0ea5e9, #0284c7);
   color: #fff;
-  box-shadow: 0 4px 12px rgb(14 165 233 / 0.3);
+  box-shadow: 0 4px 12px rgb(14 165 233 / 0.35);
+  -webkit-tap-highlight-color: transparent;
+}
+.support-telegram-btn:active {
+  opacity: 0.92;
 }
 .support-bubble-time {
   @apply block text-[10px] mt-1 opacity-70;

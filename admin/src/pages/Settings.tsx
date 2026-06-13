@@ -585,9 +585,10 @@ export default function Settings() {
           <SectionTitle>Support Telegram</SectionTitle>
         </div>
         <p className="text-sm text-slate-500 mb-4">
-          When a user sends a message in Live Support, they automatically receive this Telegram link to chat with your
-          team. Use a channel, group, or bot link — e.g. <code className="text-xs">@silverpay_support</code> or{" "}
-          <code className="text-xs">https://t.me/silverpay_support</code>.
+          When a user sends a message in Live Support, they automatically receive a Telegram button to chat with your
+          team. Use a channel, group, bot, or private invite link — e.g.{" "}
+          <code className="text-xs">@silverpay_support</code>, <code className="text-xs">https://t.me/silverpay_support</code>, or{" "}
+          <code className="text-xs">https://t.me/+invitecode</code>.
         </p>
         <form onSubmit={saveSupportTelegram} className="space-y-4">
           <div>

@@ -8,22 +8,20 @@ export function normalizeTelegramUrl(raw: string): string {
   return `https://t.me/${s.replace(/^\/+/, "")}`;
 }
 
+/** Human label for banner/button — handles @user and private invite links (t.me/+xxx). */
 export function telegramDisplayLabel(url: string): string {
   const m = url.match(/t\.me\/([^/?#]+)/i);
-  if (m?.[1]) return `@${m[1]}`;
-  return "Telegram";
+  if (!m?.[1]) return "Telegram Support";
+  const slug = decodeURIComponent(m[1]);
+  if (slug.startsWith("+") || slug.startsWith("joinchat")) return "Telegram Support";
+  return `@${slug}`;
 }
 
-export function buildSupportTelegramAutoReply(url: string): string {
-  const label = telegramDisplayLabel(url);
+export function buildSupportTelegramAutoReply(): string {
   return [
     "Thanks for your message!",
     "",
-    `For faster support, chat with us on Telegram (${label}):`,
-    url,
-    "",
-    "Tap the link above to open Telegram and continue there.",
+    "For faster support, continue on Telegram.",
+    "Tap the button below to open our support chat.",
   ].join("\n");
 }
-
-export const SUPPORT_TELEGRAM_AUTO_MARKER = "[support-telegram-auto]";

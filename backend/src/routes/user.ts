@@ -877,7 +877,6 @@ userRouter.post("/support/messages", async (req: AuthRequest, res) => {
   const { getSupportTelegramUrl } = await import("../lib/appSettings.js");
   const {
     buildSupportTelegramAutoReply,
-    SUPPORT_TELEGRAM_AUTO_MARKER,
   } = await import("../lib/supportTelegram.js");
   const schema = z.object({ body: z.string().min(1).max(2000) });
   const parsed = schema.safeParse(req.body);
@@ -895,8 +894,7 @@ userRouter.post("/support/messages", async (req: AuthRequest, res) => {
 
   const telegramUrl = await getSupportTelegramUrl();
   if (telegramUrl) {
-    const autoBody = `${SUPPORT_TELEGRAM_AUTO_MARKER}\n${buildSupportTelegramAutoReply(telegramUrl)}`;
-    conv.messages.push({ sender: "SYSTEM", body: autoBody });
+    conv.messages.push({ sender: "SYSTEM", body: buildSupportTelegramAutoReply() });
   }
 
   await conv.save();

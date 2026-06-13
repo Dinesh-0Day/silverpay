@@ -19,19 +19,31 @@ function timeLabel(iso?: string) {
   return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
 
-function cleanMessageBody(body: string) {
-  return body.replace(/^\[support-telegram-auto\]\n?/, "");
+/** Strip legacy auto-reply noise (marker, raw URLs, bad @ labels). */
+function formatSystemMessage(body: string, telegramUrl: string): string {
+  let text = body
+    .replace(/^\[support-telegram-auto\]\s*/i, "")
+    .replace(/https?:\/\/t\.me\/[^\s]+/gi, "")
+    .replace(/For faster support, chat with us on Telegram\s*\([^)]*\):?/gi, "")
+    .replace(/Tap the link above[^\n]*/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (!text) {
+    text = "Thanks for your message!\n\nFor faster support, continue on Telegram.\nTap the button below to open our support chat.";
+  }
+  return text;
 }
 
-function extractTelegramUrl(text: string): string | null {
-  const m = text.match(/https?:\/\/t\.me\/[^\s]+/i);
-  return m?.[0] ?? null;
+function isTelegramAutoMessage(m: SupportMessage) {
+  if (m.sender === "SYSTEM") return true;
+  return /\[support-telegram-auto\]/i.test(m.body) || /https?:\/\/t\.me\//i.test(m.body);
 }
 
 export default function Support() {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [telegramUrl, setTelegramUrl] = useState("");
-  const [telegramLabel, setTelegramLabel] = useState("Telegram");
+  const [telegramLabel, setTelegramLabel] = useState("Telegram Support");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
@@ -46,7 +58,7 @@ export default function Support() {
       .then((r) => {
         setMessages(r.messages ?? []);
         setTelegramUrl(r.telegramUrl?.trim() ?? "");
-        setTelegramLabel(r.telegramLabel?.trim() || "Telegram");
+        setTelegramLabel(r.telegramLabel?.trim() || "Telegram Support");
         setLoadError("");
       })
       .catch((e) => setLoadError(getErrorMessage(e)))
@@ -111,7 +123,7 @@ export default function Support() {
           </span>
           <span className="support-telegram-banner-text">
             <strong>Fastest help on Telegram</strong>
-            <span>Chat with {telegramLabel} — tap to open</span>
+            <span>Chat with {telegramLabel}</span>
           </span>
           <span className="support-telegram-banner-cta">Open</span>
         </a>
@@ -148,24 +160,27 @@ export default function Support() {
           )}
           {messages.map((m) => {
             const isUser = m.sender === "USER";
-            const isSystem = m.sender === "SYSTEM";
-            const displayBody = cleanMessageBody(m.body);
-            const msgTelegramUrl = isSystem ? extractTelegramUrl(displayBody) ?? telegramUrl : null;
+            const isTelegramAuto = isTelegramAutoMessage(m);
+            const displayBody = isTelegramAuto
+              ? formatSystemMessage(m.body, telegramUrl)
+              : m.body;
             return (
               <div
                 key={m.id}
-                className={`support-bubble-row${isUser ? " is-user" : " is-staff"}${isSystem ? " is-system" : ""}`}
+                className={`support-bubble-row${isUser ? " is-user" : " is-staff"}${isTelegramAuto ? " is-system" : ""}`}
               >
-                <div className={`support-bubble${isUser ? " is-user" : " is-staff"}${isSystem ? " is-system" : ""}`}>
+                <div
+                  className={`support-bubble${isUser ? " is-user" : " is-staff"}${isTelegramAuto ? " is-system" : ""}`}
+                >
                   <p className="support-bubble-text">{displayBody}</p>
-                  {msgTelegramUrl && (
+                  {isTelegramAuto && telegramUrl && (
                     <a
-                      href={msgTelegramUrl}
+                      href={telegramUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="support-telegram-btn"
                     >
-                      Open Telegram ({telegramLabel})
+                      ✈️ Chat on {telegramLabel}
                     </a>
                   )}
                   {m.createdAt && <time className="support-bubble-time">{timeLabel(m.createdAt)}</time>}

@@ -141,8 +141,6 @@ export default function Support() {
     [resolvedTelegramUrl, telegramLabel]
   );
 
-  const hasUserMessage = messages.some((m) => m.sender === "USER");
-
   const send = async (text?: string) => {
     const msg = (text ?? body).trim();
     if (!msg) return;
@@ -245,17 +243,6 @@ export default function Support() {
           })}
         </div>
       </PageStatus>
-
-      {resolvedTelegramUrl ? (
-        <a
-          href={resolvedTelegramUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="support-telegram-compose-cta"
-        >
-          ✈️ {hasUserMessage ? "Continue on Telegram" : "Chat on Telegram"} — {resolvedLabel}
-        </a>
-      ) : null}
 
       <ErrorAlert message={error} />
       <form onSubmit={onSubmit} className="support-compose">
